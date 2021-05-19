@@ -60,8 +60,17 @@ class Blockchain:
         self.chain.append(block)
         return True
 
-    @staticmethod
-    def proof_of_work(block):
+    @classmethod
+    def is_valid_proof(cls, block, block_hash):
+        """
+        Check if block_hash is valid hash of block 
+        and satisfies the difficulty criteria.
+        """
+        return (block_hash.startswith('0' * cls.difficulty) and
+                block_hash == block.compute_hash())
+
+    @classmethod
+    def proof_of_work(cls, block):
         """
         Function that tries different values of nonce to get a hash
         that satisfies our difficulty criteria.
@@ -69,7 +78,7 @@ class Blockchain:
         block.nonce = 0
 
         computed_hash = block.compute_hash()
-        while not computed_hash.startswith('0' * Blockchain.difficulty):
+        while not computed_hash.startswith('0' * cls.difficulty):
             block.nonce += 1
             computed_hash = block.compute_hash()
 
@@ -77,15 +86,6 @@ class Blockchain:
 
     def add_new_transaction(self, transaction):
         self.unconfirmed_transactions.append(transaction)
-
-    @classmethod
-    def is_valid_proof(cls, block, block_hash):
-        """
-        Check if block_hash is valid hash of block and satisfies
-        the difficulty criteria.
-        """
-        return (block_hash.startswith('0' * Blockchain.difficulty) and
-                block_hash == block.compute_hash())
 
     @classmethod
     def check_chain_validity(cls, chain):
@@ -124,6 +124,7 @@ class Blockchain:
                           previous_hash=last_block.hash)
 
         proof = self.proof_of_work(new_block)
+
         self.add_block(new_block, proof)
 
         self.unconfirmed_transactions = []

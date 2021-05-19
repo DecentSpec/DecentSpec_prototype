@@ -1,3 +1,5 @@
+# nomally flask is single process, single thread, blocking-mode request handling 
+
 import json
 import time
 
@@ -45,6 +47,10 @@ def get_chain():
                        "chain": chain_data,
                        "peers": list(peers)})
 
+# endpoint to query unconfirmed transactions
+@app.route('/pending_tx')
+def get_pending_tx():
+    return json.dumps(blockchain.unconfirmed_transactions)
 
 # endpoint to request the node to mine the unconfirmed
 # transactions (if any). We'll be using it to initiate
@@ -56,6 +62,7 @@ def mine_unconfirmed_transactions():
         return "No transactions to mine"
     else:
         # Making sure we have the longest chain before announcing to the network
+        # neutrino: so the idea of implementation is - i admit the block LOCALLY first, then check the concensus. 
         chain_length = len(blockchain.chain)
         consensus()
         if chain_length == len(blockchain.chain):
@@ -64,7 +71,7 @@ def mine_unconfirmed_transactions():
         return "Block #{} is mined.".format(blockchain.last_block.index)
 
 
-# endpoint to add new peers to the network.
+# endpoint to add new peers to the network. i.e. add new friends
 @app.route('/register_node', methods=['POST'])
 def register_new_peers():
     node_address = request.get_json()["node_address"]
@@ -78,7 +85,7 @@ def register_new_peers():
     # so that he can sync
     return get_chain()
 
-
+# i.e. ask myself to make friend with others (one another node)
 @app.route('/register_with', methods=['POST'])
 def register_with_existing_node():
     """
@@ -96,6 +103,8 @@ def register_with_existing_node():
     # Make a request to register with remote node and obtain information
     response = requests.post(node_address + "/register_node",
                              data=json.dumps(data), headers=headers)
+
+    # TODO try to notify several peers simultaneously 
 
     if response.status_code == 200:
         global blockchain
@@ -147,12 +156,6 @@ def verify_and_add_block():
         return "The block was discarded by the node", 400
 
     return "Block added to the chain", 201
-
-
-# endpoint to query unconfirmed transactions
-@app.route('/pending_tx')
-def get_pending_tx():
-    return json.dumps(blockchain.unconfirmed_transactions)
 
 
 def consensus():
