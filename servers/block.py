@@ -2,13 +2,31 @@ from hashlib import sha256
 import json
 import time
 
+def mix(local_weights, aggr_para):
+    # TODO implement EWMA HERE
+    # 1 normal FedAvg
+    # 2 EWMA
+    return None
+
 class Block:
-    def __init__(self, index, transactions, timestamp, previous_hash, nonce=0):
-        self.index = index
+    def __init__(self, index, transactions, timestamp, previous_hash, nonce=0, \
+                miner="anonymous", difficulty=2, aggr_para=None):     # TODO, add those new arguments
+        
+        # model update list, all those local weights
         self.transactions = transactions
-        self.timestamp = timestamp
-        self.previous_hash = previous_hash
-        self.nonce = nonce
+        # global model, we use a lazy policy to generate global model when we need it, to save time
+        self.__global_model = None
+
+        # header, since we do not use a Merkle tree, no need to package them into a standalone head
+        self.index = index                      # also, block id
+        self.timestamp = timestamp              # timestamp
+        self.previous_hash = previous_hash      # hash of previous block
+        self.nonce = nonce                      # nonce
+        self.miner = miner                      # miner's public key
+        self.difficulty = difficulty            # difficulty
+
+        # model aggregation parameters
+        self.aggr_para = aggr_para              # model aggregation parameters
 
     def compute_hash(self):
         """
@@ -17,9 +35,17 @@ class Block:
         block_string = json.dumps(self.__dict__, sort_keys=True)
         return sha256(block_string.encode()).hexdigest()
 
+    def get_global(self):
+        if self.__global_model != None:
+            return self.__global_model
+        if self.transactions == None or self.aggr_para == None:
+            return None
+        return mix(self.transactions, self.aggr_para)
+
 
 class Blockchain:
     # difficulty of our PoW algorithm
+    # currently it is fixed, but we will make it modifiable TODO
     difficulty = 2
 
     def __init__(self):
@@ -107,6 +133,8 @@ class Blockchain:
 
         return result
 
+    # Neutrino: another problem is: it is a trigger-based mining, not automatically
+    # TODO: add an extra thread to wake it periodically 
     def mine(self):
         """
         This function serves as an interface to add the pending
