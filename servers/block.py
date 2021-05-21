@@ -2,7 +2,7 @@ from hashlib import sha256
 import json
 import time
 
-def mix(local_weights, aggr_para):
+def mix(local_weights, aggr_para, base_model):
     # TODO implement EWMA HERE
     # 1 normal FedAvg
     # 2 EWMA
@@ -10,12 +10,13 @@ def mix(local_weights, aggr_para):
 
 class Block:
     def __init__(self, index, transactions, timestamp, previous_hash, nonce=0, \
-                miner="anonymous", difficulty=2, aggr_para=None):     # TODO, add those new arguments
+                base_model=None, miner="anonymous", difficulty=2, aggr_para=None):     # TODO, add those new arguments
         
         # model update list, all those local weights
         self.transactions = transactions
         # global model, we use a lazy policy to generate global model when we need it, to save time
-        self.__global_model = None
+        self.base_model = base_model            # the start model for those local weights
+        self.__global_model = None              # the gathered new global model
 
         # header, since we do not use a Merkle tree, no need to package them into a standalone head
         self.index = index                      # also, block id
@@ -31,8 +32,11 @@ class Block:
     def compute_hash(self):
         """
         A function that return the hash of the block contents.
+        the content do not include the lazy global model
         """
-        block_string = json.dumps(self.__dict__, sort_keys=True)
+        content = self.__dict__
+        content.pop('__global_model')
+        block_string = json.dumps(content, sort_keys=True)
         return sha256(block_string.encode()).hexdigest()
 
     def get_global(self):
@@ -40,7 +44,7 @@ class Block:
             return self.__global_model
         if self.transactions == None or self.aggr_para == None:
             return None
-        return mix(self.transactions, self.aggr_para)
+        return mix(self.transactions, self.aggr_para, self.base_model)
 
 
 class Blockchain:
