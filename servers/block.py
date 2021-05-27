@@ -48,7 +48,7 @@ class Block:
         return mix(self.transactions, self.aggr_para, self.base_model)
 
 
-class Blockchain:
+class BlockChain:
     # difficulty of our PoW algorithm
     # currently it is fixed, but we will make it modifiable TODO
     difficulty = 2
@@ -83,7 +83,7 @@ class Blockchain:
         if previous_hash != block.previous_hash:
             return False
 
-        if not Blockchain.is_valid_proof(block, proof):
+        if not BlockChain.is_valid_proof(block, proof):
             return False
 
         block.hash = proof
@@ -162,31 +162,3 @@ class Blockchain:
 
         # TODO do not forget to empty the pool in outside context
         return True
-
-class Modelpool:
-    def __init__(self):
-        # self.pool = set()
-        # set can not include a dict so we still use list, but list is much slower in index
-        self.pool = []
-
-    def getPool(self):
-        return self.pool
-
-    def add(self, model):
-        # self.pool.add(model)
-        self.pool.append(model)
-    
-    # we use a list instead of set, so it is not supported currently
-    # def remove(self, subpool):
-    #     self.pool = self.pool - subpool
-
-    def clear(self):
-        # self.pool = set()
-        self.pool = []
-
-class Localmodel:
-    def __init__(self, model):
-        self.model = model
-    
-    def getModel(self):
-        return self.model

@@ -8,17 +8,21 @@ from collections import namedtuple
 from flask import Flask, request
 import requests
 
-from block import Block, Blockchain, Modelpool, Localmodel
+from block import Block, BlockChain
+from model import ModelPool, LocalModel, ModelPara
 
 app = Flask(__name__)
 
-# the node's copy of blockchain
+# the node's copy of blockchain, together with their locks
 bc_lock = Lock()
-mychain = Blockchain()
+mychain = BlockChain()
 mychain.create_genesis_block()
 
 pool_lock = Lock()
-mypool = Modelpool()
+mypool = ModelPool()
+
+para_lock = Lock()
+mypara = ModelPara()
 
 # the address to other participating members of the network
 peers = set()
@@ -75,7 +79,7 @@ def register_with_existing_node():
         return response.content, response.status_code
 
 def create_chain_from_dump(chain_dump):
-    generated_blockchain = Blockchain()
+    generated_blockchain = BlockChain()
     generated_blockchain.create_genesis_block()
     for idx, block_data in enumerate(chain_dump):
         if idx == 0:
