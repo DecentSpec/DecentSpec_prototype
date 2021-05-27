@@ -22,41 +22,8 @@ mypool = Modelpool()
 # the address to other participating members of the network
 peers = set()
 
-# endpoint to submit a new transaction. This will be used by
-# our application to add new data (posts) to the blockchain
-@app.route('/new_transaction', methods=['POST'])
-def new_transaction(): 
-    tx_data = request.get_json()
-    required_fields = ["author", "content"]
-
-    for field in required_fields:
-        if not tx_data.get(field):
-            return "Invalid transaction data", 404
-
-    tx_data["timestamp"] = time.time()
-    global mypool
-    mypool.add(tx_data)
-    # TODO share the tx among other peers
-    return "Success", 201
-
-# endpoint to return the node's copy of the chain.
-# Our application will be using this endpoint to query
-# all the posts to display.
-@app.route('/chain', methods=['GET'])
-def get_chain():
-    chain_data = []
-    for block in mychain.chain:
-        chain_data.append(block.__dict__)
-    return json.dumps({"length": len(chain_data),
-                       "chain": chain_data,
-                       "peers": list(peers)})
-
-# endpoint to query unconfirmed transactions
-@app.route('/pending_tx')
-def get_pending_tx():
-    global mypool
-    return json.dumps(mypool.getPool())
-
+# ========================================================================================
+# peer register related api
 
 # endpoint to add new peers to the network. i.e. add new friends
 @app.route('/register_node', methods=['POST'])
@@ -73,6 +40,7 @@ def register_new_peers():
     return get_chain()
 
 # i.e. ask myself to make friend with others (one another node)
+# will be changed to the automatic sync with seed node
 @app.route('/register_with', methods=['POST'])
 def register_with_existing_node():
     """
@@ -105,7 +73,6 @@ def register_with_existing_node():
         # if something goes wrong, pass it on to the API response
         return response.content, response.status_code
 
-
 def create_chain_from_dump(chain_dump):
     generated_blockchain = Blockchain()
     generated_blockchain.create_genesis_block()
@@ -123,6 +90,43 @@ def create_chain_from_dump(chain_dump):
             raise Exception("The chain dump is tampered!!")
     return generated_blockchain
 
+# ========================================================================================
+# mypool related api
+
+# endpoint to submit a new transaction. This will be used by
+# our application to add new data (posts) to the blockchain
+@app.route('/new_transaction', methods=['POST'])
+def new_transaction(): 
+    tx_data = request.get_json()
+    required_fields = ["author", "content"]
+
+    for field in required_fields:
+        if not tx_data.get(field):
+            return "Invalid transaction data", 404
+
+    tx_data["timestamp"] = time.time()
+    global mypool
+    mypool.add(tx_data)
+    # TODO share the tx among other peers
+    return "Success", 201
+
+# endpoint to query unconfirmed transactions
+@app.route('/pending_tx')
+def get_pending_tx():
+    global mypool
+    return json.dumps(mypool.getPool())
+
+# ========================================================================================
+# mychain related api
+
+@app.route('/chain', methods=['GET'])
+def get_chain():
+    chain_data = []
+    for block in mychain.chain:
+        chain_data.append(block.__dict__)
+    return json.dumps({"length": len(chain_data),
+                       "chain": chain_data,
+                       "peers": list(peers)})
 
 # endpoint to add a block mined by someone else to
 # the node's chain. The block is first verified by the node
@@ -144,39 +148,25 @@ def verify_and_add_block():
 
     return "Block added to the chain", 201
 
-# endpoint to request the node to mine the unconfirmed
-# transactions (if any). We'll be using it to initiate
-# a command to mine from our application itself.
-
-
-thread = Thread(name='mine_daemon', target=mine_unconfirmed_transactions)
-thread.setDaemon(True)
-thread.start()
-
+# ========================================================================================
+# the daemon thread for mining automatically
 
 # now we init the mine as a daemon thread
 def mine_unconfirmed_transactions():
 
     global mypool
     while True:
-        # wait for 1s
-        # check the size of transaction pool
-        # mine for a candidate block
-        # concensus with this candidate block
-        # announce if i am the chosen one
-        pass
-
-    result = mychain.mine(mypool)
-
-    if not result:
-        return "No transactions to mine"
-    else:
-        mypool.clear()
-        chain_length = len(mychain.chain)
-        consensus()
-        if chain_length == len(mychain.chain):
-            announce_new_block(mychain.last_block)
-        print("Block #{} is mined.".format(mychain.last_block.index))
+        time.sleep(3)
+        result = mychain.mine(mypool)
+        if not result:
+            pass
+        else:
+            mypool.clear()
+            chain_length = len(mychain.chain)
+            consensus()
+            if chain_length == len(mychain.chain):
+                announce_new_block(mychain.last_block)
+            print("Block #{} is mined.".format(mychain.last_block.index))
 
 def consensus():
     """
@@ -185,7 +175,7 @@ def consensus():
     """
     global mychain
 
-    longest_chain = None
+    longest_chain = mychain
     current_len = len(mychain.chain)
 
     for node in peers:
@@ -221,3 +211,7 @@ def announce_new_block(block):
         requests.post(url,
                       data=json.dumps(block.__dict__, sort_keys=True),
                       headers=headers)
+
+thread = Thread(name='mine_daemon', target=mine_unconfirmed_transactions)
+thread.setDaemon(True)
+thread.start()

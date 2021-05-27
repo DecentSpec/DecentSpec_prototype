@@ -157,7 +157,7 @@ class Blockchain:
 
         self.add_block(new_block, proof)
 
-        # TODO do not forget to empty the pool in outside
+        # TODO do not forget to empty the pool in outside context
         return True
 
 class Modelpool:
