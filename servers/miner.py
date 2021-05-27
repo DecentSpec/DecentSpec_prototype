@@ -20,7 +20,7 @@ peers = set()
 # endpoint to submit a new transaction. This will be used by
 # our application to add new data (posts) to the blockchain
 @app.route('/new_transaction', methods=['POST'])
-def new_transaction():
+def new_transaction(): 
     tx_data = request.get_json()
     required_fields = ["author", "content"]
 
@@ -33,7 +33,6 @@ def new_transaction():
     blockchain.add_new_transaction(tx_data)
 
     return "Success", 201
-
 
 # endpoint to return the node's copy of the chain.
 # Our application will be using this endpoint to query
@@ -51,25 +50,6 @@ def get_chain():
 @app.route('/pending_tx')
 def get_pending_tx():
     return json.dumps(blockchain.unconfirmed_transactions)
-
-# endpoint to request the node to mine the unconfirmed
-# transactions (if any). We'll be using it to initiate
-# a command to mine from our application itself.
-@app.route('/mine', methods=['GET'])
-def mine_unconfirmed_transactions():
-    result = blockchain.mine()
-    if not result:
-        return "No transactions to mine"
-    else:
-        # Making sure we have the longest chain before announcing to the network
-        # neutrino: so the idea of implementation is - i admit the block LOCALLY first, then check the concensus. 
-        chain_length = len(blockchain.chain)
-        consensus()
-        # careful the original chain is overwritten if it straggles
-        if chain_length == len(blockchain.chain):
-            # announce the recently mined block to the network
-            announce_new_block(blockchain.last_block)
-        return "Block #{} is mined.".format(blockchain.last_block.index)
 
 
 # endpoint to add new peers to the network. i.e. add new friends
@@ -158,6 +138,24 @@ def verify_and_add_block():
 
     return "Block added to the chain", 201
 
+# endpoint to request the node to mine the unconfirmed
+# transactions (if any). We'll be using it to initiate
+# a command to mine from our application itself.
+@app.route('/mine', methods=['GET'])
+def mine_unconfirmed_transactions():
+    result = blockchain.mine()
+    if not result:
+        return "No transactions to mine"
+    else:
+        # Making sure we have the longest chain before announcing to the network
+        # neutrino: so the idea of implementation is - i admit the block LOCALLY first, then check the concensus. 
+        chain_length = len(blockchain.chain)
+        consensus()
+        # careful the original chain is overwritten if it straggles
+        if chain_length == len(blockchain.chain):
+            # announce the recently mined block to the network
+            announce_new_block(blockchain.last_block)
+        return "Block #{} is mined.".format(blockchain.last_block.index)
 
 def consensus():
     """
@@ -189,7 +187,6 @@ def consensus():
     there may be some unawared contention happening. due to the Equal length of chain will not be compare.
     but statistically it seems not a big problem
     """
-
 
 def announce_new_block(block):
     """

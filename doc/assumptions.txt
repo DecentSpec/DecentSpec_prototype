@@ -1,0 +1,3 @@
+for miner:
+    1 currently ignore digital signature
+    2 currently use flask builtin http server (low performance actually)

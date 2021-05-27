@@ -35,7 +35,7 @@ class Block:
         the content do not include the lazy global model
         """
         content = self.__dict__
-        content.pop('__global_model')
+        # content.pop('__global_model')
         block_string = json.dumps(content, sort_keys=True)
         return sha256(block_string.encode()).hexdigest()
 
