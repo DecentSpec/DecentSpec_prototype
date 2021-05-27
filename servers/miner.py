@@ -2,17 +2,22 @@
 
 import json
 import time
+from threading import Thread, Lock
 
 from flask import Flask, request
 import requests
 
-from block import Block, Blockchain
+from block import Block, Blockchain, Modelpool
 
 app = Flask(__name__)
 
 # the node's copy of blockchain
-blockchain = Blockchain()
-blockchain.create_genesis_block()
+bc_lock = Lock()
+mychain = Blockchain()
+mychain.create_genesis_block()
+
+pool_lock = Lock()
+mypool = Modelpool()
 
 # the address to other participating members of the network
 peers = set()
@@ -29,9 +34,9 @@ def new_transaction():
             return "Invalid transaction data", 404
 
     tx_data["timestamp"] = time.time()
-
-    blockchain.add_new_transaction(tx_data)
-
+    global mypool
+    mypool.add(tx_data)
+    # TODO share the tx among other peers
     return "Success", 201
 
 # endpoint to return the node's copy of the chain.
@@ -40,7 +45,7 @@ def new_transaction():
 @app.route('/chain', methods=['GET'])
 def get_chain():
     chain_data = []
-    for block in blockchain.chain:
+    for block in mychain.chain:
         chain_data.append(block.__dict__)
     return json.dumps({"length": len(chain_data),
                        "chain": chain_data,
@@ -49,7 +54,8 @@ def get_chain():
 # endpoint to query unconfirmed transactions
 @app.route('/pending_tx')
 def get_pending_tx():
-    return json.dumps(blockchain.unconfirmed_transactions)
+    global mypool
+    return json.dumps(mypool.getPool())
 
 
 # endpoint to add new peers to the network. i.e. add new friends
@@ -88,11 +94,11 @@ def register_with_existing_node():
     # TODO try to notify several peers simultaneously 
 
     if response.status_code == 200:
-        global blockchain
+        global mychain
         global peers
         # update chain and the peers
         chain_dump = response.json()['chain']
-        blockchain = create_chain_from_dump(chain_dump)
+        mychain = create_chain_from_dump(chain_dump)
         peers.update(response.json()['peers'])
         return "Registration successful", 200
     else:
@@ -131,7 +137,7 @@ def verify_and_add_block():
                   block_data["nonce"])
 
     proof = block_data['hash']
-    added = blockchain.add_block(block, proof)
+    added = mychain.add_block(block, proof)
 
     if not added:
         return "The block was discarded by the node", 400
@@ -141,42 +147,57 @@ def verify_and_add_block():
 # endpoint to request the node to mine the unconfirmed
 # transactions (if any). We'll be using it to initiate
 # a command to mine from our application itself.
-@app.route('/mine', methods=['GET'])
+
+
+thread = Thread(name='mine_daemon', target=mine_unconfirmed_transactions)
+thread.setDaemon(True)
+thread.start()
+
+
+# now we init the mine as a daemon thread
 def mine_unconfirmed_transactions():
-    result = blockchain.mine()
+
+    global mypool
+    while True:
+        # wait for 1s
+        # check the size of transaction pool
+        # mine for a candidate block
+        # concensus with this candidate block
+        # announce if i am the chosen one
+        pass
+
+    result = mychain.mine(mypool)
+
     if not result:
         return "No transactions to mine"
     else:
-        # Making sure we have the longest chain before announcing to the network
-        # neutrino: so the idea of implementation is - i admit the block LOCALLY first, then check the concensus. 
-        chain_length = len(blockchain.chain)
+        mypool.clear()
+        chain_length = len(mychain.chain)
         consensus()
-        # careful the original chain is overwritten if it straggles
-        if chain_length == len(blockchain.chain):
-            # announce the recently mined block to the network
-            announce_new_block(blockchain.last_block)
-        return "Block #{} is mined.".format(blockchain.last_block.index)
+        if chain_length == len(mychain.chain):
+            announce_new_block(mychain.last_block)
+        print("Block #{} is mined.".format(mychain.last_block.index))
 
 def consensus():
     """
-    Our naive consnsus algorithm. If a longer valid chain is
+    Our naive consensus algorithm. If a longer valid chain is
     found, our chain is replaced with it.
     """
-    global blockchain
+    global mychain
 
     longest_chain = None
-    current_len = len(blockchain.chain)
+    current_len = len(mychain.chain)
 
     for node in peers:
         response = requests.get('{}chain'.format(node))
         length = response.json()['length']
         chain = response.json()['chain']
-        if length > current_len and blockchain.check_chain_validity(chain):
+        if length > current_len and mychain.check_chain_validity(chain):
             current_len = length
             longest_chain = chain
 
     if longest_chain:
-        blockchain = longest_chain
+        mychain = longest_chain
         return True
 
     return False
@@ -200,6 +221,3 @@ def announce_new_block(block):
         requests.post(url,
                       data=json.dumps(block.__dict__, sort_keys=True),
                       headers=headers)
-
-# Uncomment this line if you want to specify the port number in the code
-#app.run(debug=True, port=8000)

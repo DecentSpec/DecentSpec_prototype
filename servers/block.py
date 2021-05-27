@@ -16,7 +16,7 @@ class Block:
         self.transactions = transactions
         # global model, we use a lazy policy to generate global model when we need it, to save time
         self.base_model = base_model            # the start model for those local weights
-        self.__global_model = None              # the gathered new global model
+        self.global_model = None              # the gathered new global model
 
         # header, since we do not use a Merkle tree, no need to package them into a standalone head
         self.index = index                      # also, block id
@@ -35,13 +35,13 @@ class Block:
         the content do not include the lazy global model
         """
         content = self.__dict__
-        # content.pop('__global_model')
+        content.pop('global_model') # remove the gobal_model cause it is lazy generated
         block_string = json.dumps(content, sort_keys=True)
         return sha256(block_string.encode()).hexdigest()
 
     def get_global(self):
-        if self.__global_model != None:
-            return self.__global_model
+        if self.global_model != None:
+            return self.global_model
         if self.transactions == None or self.aggr_para == None:
             return None
         return mix(self.transactions, self.aggr_para, self.base_model)
@@ -53,7 +53,6 @@ class Blockchain:
     difficulty = 2
 
     def __init__(self):
-        self.unconfirmed_transactions = []
         self.chain = []
 
     def create_genesis_block(self):
@@ -114,9 +113,6 @@ class Blockchain:
 
         return computed_hash
 
-    def add_new_transaction(self, transaction):
-        self.unconfirmed_transactions.append(transaction)
-
     @classmethod
     def check_chain_validity(cls, chain):
         result = True
@@ -139,19 +135,21 @@ class Blockchain:
 
     # Neutrino: another problem is: it is a trigger-based mining, not automatically
     # TODO: add an extra thread to wake it periodically 
-    def mine(self):
+    def mine(self, unconfirmed_transactions):
         """
         This function serves as an interface to add the pending
         transactions to the blockchain by adding them to the block
         and figuring out Proof Of Work.
         """
-        if not self.unconfirmed_transactions:
+        unconfirmed_transactions = list(unconfirmed_transactions)
+        
+        if not unconfirmed_transactions:
             return False
 
         last_block = self.last_block
 
         new_block = Block(index=last_block.index + 1,
-                          transactions=self.unconfirmed_transactions,
+                          transactions=unconfirmed_transactions,
                           timestamp=time.time(),
                           previous_hash=last_block.hash)
 
@@ -159,6 +157,21 @@ class Blockchain:
 
         self.add_block(new_block, proof)
 
-        self.unconfirmed_transactions = []
-
+        # TODO do not forget to empty the pool in outside
         return True
+
+class Modelpool:
+    def __init__(self):
+        self.pool = set()
+
+    def getPool(self):
+        return self.pool
+
+    def add(self, model):
+        self.pool.add(model)
+    
+    def remove(self, subpool):
+        self.pool = self.pool - subpool
+
+    def clear(self):
+        self.pool = set()
