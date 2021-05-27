@@ -35,7 +35,8 @@ class Block:
         the content do not include the lazy global model
         """
         content = self.__dict__
-        content.pop('global_model') # remove the gobal_model cause it is lazy generated
+        if 'global_model' in content:
+            content.pop('global_model') # remove the gobal_model cause it is lazy generated
         block_string = json.dumps(content, sort_keys=True)
         return sha256(block_string.encode()).hexdigest()
 
@@ -141,7 +142,9 @@ class Blockchain:
         transactions to the blockchain by adding them to the block
         and figuring out Proof Of Work.
         """
-        unconfirmed_transactions = list(unconfirmed_transactions)
+        # unconfirmed_transactions = list(unconfirmed_transactions)
+        # map(lambda x: x.getModel(), unconfirmed_transactions)
+        # because set can not include dict, so we turn set into list and map each element in list from object to dict
         
         if not unconfirmed_transactions:
             return False
@@ -162,16 +165,28 @@ class Blockchain:
 
 class Modelpool:
     def __init__(self):
-        self.pool = set()
+        # self.pool = set()
+        # set can not include a dict so we still use list, but list is much slower in index
+        self.pool = []
 
     def getPool(self):
         return self.pool
 
     def add(self, model):
-        self.pool.add(model)
+        # self.pool.add(model)
+        self.pool.append(model)
     
-    def remove(self, subpool):
-        self.pool = self.pool - subpool
+    # we use a list instead of set, so it is not supported currently
+    # def remove(self, subpool):
+    #     self.pool = self.pool - subpool
 
     def clear(self):
-        self.pool = set()
+        # self.pool = set()
+        self.pool = []
+
+class Localmodel:
+    def __init__(self, model):
+        self.model = model
+    
+    def getModel(self):
+        return self.model

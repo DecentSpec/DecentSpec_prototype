@@ -3,11 +3,12 @@
 import json
 import time
 from threading import Thread, Lock
+from collections import namedtuple
 
 from flask import Flask, request
 import requests
 
-from block import Block, Blockchain, Modelpool
+from block import Block, Blockchain, Modelpool, Localmodel
 
 app = Flask(__name__)
 
@@ -106,6 +107,7 @@ def new_transaction():
 
     tx_data["timestamp"] = time.time()
     global mypool
+    # mypool.add(Localmodel(tx_data)) # dict can not be an element of set so we package it into an object
     mypool.add(tx_data)
     # TODO share the tx among other peers
     return "Success", 201
@@ -157,7 +159,8 @@ def mine_unconfirmed_transactions():
     global mypool
     while True:
         time.sleep(3)
-        result = mychain.mine(mypool)
+        print("i am trying mining")
+        result = mychain.mine(mypool.getPool())
         if not result:
             pass
         else:

@@ -1,3 +1,4 @@
 for miner:
     1 currently ignore digital signature
     2 currently use flask builtin http server (low performance actually)
+    3 localModel pool is of list instead of set for an easier implementation, need to change to set in the future for a faster index
