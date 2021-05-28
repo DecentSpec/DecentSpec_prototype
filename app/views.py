@@ -1,5 +1,6 @@
 import datetime
 import json
+import time
 
 import requests
 from flask import render_template, redirect, request
@@ -25,8 +26,6 @@ def fetch_posts():
         chain = json.loads(response.content)
         for block in chain["chain"]:
             for tx in block["transactions"]:
-                tx["index"] = block["index"]
-                tx["hash"] = block["previous_hash"]
                 content.append(tx)
 
         global posts
@@ -52,10 +51,12 @@ def submit_textarea():
     """
     post_content = request.form["content"]
     author = request.form["author"]
+    timestamp = time.time()
 
     post_object = {
         'author': author,
         'content': post_content,
+        'timestamp' : timestamp,
     }
 
     # Submit a transaction
@@ -69,4 +70,4 @@ def submit_textarea():
 
 
 def timestamp_to_string(epoch_time):
-    return datetime.datetime.fromtimestamp(epoch_time).strftime('%H:%M')
+    return datetime.datetime.fromtimestamp(epoch_time).strftime('%H:%M:%S')

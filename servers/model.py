@@ -1,31 +1,25 @@
 class ModelPool:
     def __init__(self):
-        # self.pool = set()
-        # set can not include a dict so we still use list, but list is much slower in index
-        # TODO change from list to set
-        self.pool = []
+        self.pool = set()
 
-    def getPool(self):
-        return self.pool
+    def getPool(self):      # return a list of dict 
+        return list( map(lambda x: dict(x), self.pool) )
 
-    def add(self, model):
-        # self.pool.add(model)
-        self.pool.append(model)
-    
-    # we use a list instead of set, so substraction is not supported currently
-    # def remove(self, subpool):
-    #     self.pool = self.pool - subpool
+    def add(self, model):   # send in a dict and convert it to tuple to include it into the set
+        t = tuple(model.items())
+        if t in self.pool:  # if i already have this tx, return False
+            print("I already have this tx")
+            return False
+        else:
+            self.pool.add(t)
+            return True
+
+    def remove(self, subpool):
+        self.pool = self.pool - subpool
 
     def clear(self):
-        # self.pool = set()
-        self.pool = []
+        self.pool = set()
 
-class LocalModel:
-    def __init__(self, model):
-        self.model = model
-    
-    def getModel(self):
-        return self.model
 
 class ModelPara:
     def __init__(self):

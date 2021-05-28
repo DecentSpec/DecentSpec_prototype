@@ -9,11 +9,13 @@ from flask import Flask, request
 import requests
 
 from block import Block, BlockChain
-from model import ModelPool, LocalModel, ModelPara
+from model import ModelPool, ModelPara
 
 app = Flask(__name__)
 
-# the node's copy of blockchain, together with their locks
+# TODO name/id for each miner
+
+# the node's copy of bc, pool, para, together with their locks
 bc_lock = Lock()
 mychain = BlockChain()
 mychain.create_genesis_block()
@@ -103,18 +105,21 @@ def create_chain_from_dump(chain_dump):
 @app.route('/new_transaction', methods=['POST'])
 def new_transaction(): 
     tx_data = request.get_json()
-    required_fields = ["author", "content"]
+    required_fields = ["author", "content", "timestamp"]
 
     for field in required_fields:
         if not tx_data.get(field):
             return "Invalid transaction data", 404
 
-    tx_data["timestamp"] = time.time()
     global mypool
-    # mypool.add(Localmodel(tx_data)) # dict can not be an element of set so we package it into an object
-    mypool.add(tx_data)
-    # TODO share the tx among other peers
+    if mypool.add(tx_data):
+        spread_tx_to_peers(tx_data) # TODO let a temporal thread to do the spread work
+    
     return "Success", 201
+
+def spread_tx_to_peers(tx):
+    # TODO implement the spreading
+    pass
 
 # endpoint to query unconfirmed transactions
 @app.route('/pending_tx')
@@ -220,5 +225,5 @@ def announce_new_block(block):
                       headers=headers)
 
 thread = Thread(name='mine_daemon', target=mine_unconfirmed_transactions)
-thread.setDaemon(True)
+thread.setDaemon(True)  # auto stops when we shut down __main__
 thread.start()
