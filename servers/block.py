@@ -69,7 +69,7 @@ class Block:
 class BlockChain:
     # difficulty of our PoW algorithm
     # currently it is fixed, but we will make it modifiable TODO
-    difficulty = 5
+    difficulty = 3
 
     def __init__(self):
         self.chain = []
@@ -77,7 +77,7 @@ class BlockChain:
     def clear(self):
         self.chain = []
 
-    def create_genesis_block(self):
+    def create_genesis_block(self, global_model):
         """
         A function to generate genesis block and appends it to
         the chain. The block has index 0, previous_hash as 0, and
@@ -85,6 +85,7 @@ class BlockChain:
         """
         genesis_block = Block(0, [], 0, "0")
         genesis_block.hash = genesis_block.compute_hash()
+        genesis_block.global_model = global_model
         self.chain.append(genesis_block)
         print("first block hash")
         print(genesis_block.hash)

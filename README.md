@@ -10,3 +10,5 @@ run the miner servers:
 cd servers
 source run_miner.sh
 ```
+
+notice: you need to manually kill the flask process after run_miner.sh or the corresponded port will be occupied

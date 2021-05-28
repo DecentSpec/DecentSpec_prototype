@@ -22,7 +22,7 @@ app = Flask(__name__)
 # TODO currently all operation is LOCK FREE, need add lock in the future
 bc_lock = Lock()
 mychain = BlockChain()
-mychain.create_genesis_block()
+mychain.create_genesis_block(None)
 
 pool_lock = Lock()
 mypool = ModelPool()            # candidate local models
@@ -65,7 +65,7 @@ def flush_chain():
     mypara.setPara(SeedingMsg(seed_msg))
     mypool.clear()
     mychain.clear()
-    mychain.create_genesis_block()
+    mychain.create_genesis_block(None) # TODO extract the global model seed from seed msg
     return "Reseeded the chain", 201
 
 def valid_seed(msg):
@@ -152,7 +152,8 @@ def new_transaction():
     tx_data = request.get_json()
     required_fields = ["author", "content", "timestamp"]
     # required_fields = list(LocalModel().__dict__.keys())  
-    # the tx should in consistence with our model packet structure 
+
+    # TODO the tx should in consistence with our model packet structure and within certain generation of the model
 
     for field in required_fields:
         if not tx_data.get(field):
@@ -240,7 +241,7 @@ def verify_and_add_block():
 # the daemon thread for mining automatically
 
 # now we init the mine as a daemon thread
-# TODO use a snapshot mining to avoid fork!
+# TODO use a SNAPSHOT/buffered mining to avoid fork!
 def mine_unconfirmed_transactions():
 
     global mypool
@@ -248,7 +249,7 @@ def mine_unconfirmed_transactions():
         time.sleep(BLOCK_GEN_INTERVAL)  # check the pool size per BGI
         if mypool.size() >= POOL_MIN_THRESHOLD: # gen a new block when the size achieve our threshold
             print("i am trying mining")
-            if mychain.mine(mypool.getPool()):
+            if mychain.mine(mypool.getPool()):  # TODO mine should be interrupt when receive a seed_update flush
                 if consensus(): # i am the longest
                     announce_new_block(mychain.last_block)
                     mypool.clear()  # empty the pool once you finish your mine
@@ -257,6 +258,7 @@ def mine_unconfirmed_transactions():
                     print("get a longer chain from somewhere else")
             else:
                 print("sth wrong with the embedded mine method in the chain object")
+
 
 
 def consensus():
