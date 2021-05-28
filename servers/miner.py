@@ -240,6 +240,7 @@ def verify_and_add_block():
 # the daemon thread for mining automatically
 
 # now we init the mine as a daemon thread
+# TODO use a snapshot mining to avoid fork!
 def mine_unconfirmed_transactions():
 
     global mypool
@@ -287,7 +288,7 @@ def consensus():
     TODO
     Neutrino:
     there may be some unawared contention happening. due to the Equal length of chain will not be compare.
-    but statistically it seems not a big problem
+    but statistically it seems not a big problem; it does lead to problem
     """
 
 def announce_new_block(block):

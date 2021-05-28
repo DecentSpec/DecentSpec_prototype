@@ -69,7 +69,7 @@ class Block:
 class BlockChain:
     # difficulty of our PoW algorithm
     # currently it is fixed, but we will make it modifiable TODO
-    difficulty = 2
+    difficulty = 5
 
     def __init__(self):
         self.chain = []
@@ -86,6 +86,8 @@ class BlockChain:
         genesis_block = Block(0, [], 0, "0")
         genesis_block.hash = genesis_block.compute_hash()
         self.chain.append(genesis_block)
+        print("first block hash")
+        print(genesis_block.hash)
 
     @property
     def last_block(self):
@@ -101,10 +103,20 @@ class BlockChain:
         """
         previous_hash = self.last_block.hash
 
+        if block.index != self.last_block.index + 1:
+            print("add block failed at 0")
+            # print("their block index: " + str(block.index))
+            # print("our block latest index: " + str(self.last_block.index))
+            return False
+
         if previous_hash != block.previous_hash:
+            print("add block failed at 1")
+            # print("myhash " + previous_hash)
+            # print("yourhash " + block.previous_hash)
             return False
 
         if not BlockChain.is_valid_proof(block, proof):
+            print("add block failed at 2")
             return False
 
         block.hash = proof
