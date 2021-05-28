@@ -3,9 +3,27 @@ import json
 import time
 
 def mix(local_weights, aggr_para, base_model):
-    # TODO implement EWMA HERE
-    # 1 normal FedAvg
-    # 2 EWMA
+
+    # uncomment it when edge device implemented
+
+    # alpha = aggr_para.alpha
+    # training_num = 0
+    # for idx in range(len(local_weights)):
+    #     (sample_num, averaged_params) = local_weights[idx]
+    #     training_num += sample_num
+
+    # (sample_num, averaged_params) = local_weights[0]
+    # for k in averaged_params.keys():                                                        # for each parameter in a model
+    #     for i in range(0, len(local_weights)):
+    #         local_sample_number, local_model_params = local_weights[i]
+    #         w = local_sample_number / training_num
+    #         if i == 0:
+    #             averaged_params[k] = local_model_params[k] * w
+    #         else:
+    #             averaged_params[k] += local_model_params[k] * w                             # dataset size-weighted average
+    #     averaged_params[k] = (1-alpha) * local_weights[k] + alpha * averaged_params[k]      # EWMA
+    # return averaged_params
+
     return None
 
 class Block:
@@ -54,6 +72,9 @@ class BlockChain:
     difficulty = 2
 
     def __init__(self):
+        self.chain = []
+    
+    def clear(self):
         self.chain = []
 
     def create_genesis_block(self):
@@ -134,8 +155,6 @@ class BlockChain:
 
         return result
 
-    # Neutrino: another problem is: it is a trigger-based mining, not automatically
-    # TODO: add an extra thread to wake it periodically 
     def mine(self, unconfirmed_transactions):
         """
         This function serves as an interface to add the pending
@@ -160,5 +179,5 @@ class BlockChain:
 
         self.add_block(new_block, proof)
 
-        # TODO do not forget to empty the pool in outside context
+        # do not forget to empty the pool in outside context
         return True

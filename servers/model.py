@@ -20,6 +20,8 @@ class ModelPool:
     def clear(self):
         self.pool = set()
 
+    def size(self):
+        return len(self.pool)
 
 class ModelPara:
     def __init__(self):
@@ -27,3 +29,16 @@ class ModelPara:
     
     def setPara(self, para):
         self.para = para
+
+class LocalModel:       # this is not an actual class we will use, just format the json structure of tx we received
+    def __init__(self):
+        self.id = None          # client id, or pub_key
+        self.weights = None     # local parameters
+        self.size = None        # size of dataset
+        self.base = None        # version of base_global_model, may sha256 to uniquely assign it
+
+class Seed:             # this is not an actual class we will use, just format the json structure of seed we received
+    def __init__(self):
+        self.id = None
+        self.model = None
+        self.para = None

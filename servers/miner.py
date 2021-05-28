@@ -3,19 +3,20 @@
 import json
 import time
 from threading import Thread, Lock
-from collections import namedtuple
 
 from flask import Flask, request
 import requests
 
 from block import Block, BlockChain
-from model import ModelPool, ModelPara
+from model import ModelPool, ModelPara, LocalModel
+
+BLOCK_GEN_INTERVAL = 3 # unit second
+POOL_MIN_THRESHOLD = 1
 
 app = Flask(__name__)
 
-# TODO name/id for each miner
-
-# the node's copy of bc, pool, para, together with their locks
+# global vars, together with their locks
+# TODO currently all operation is lock free, need add lock in the future
 bc_lock = Lock()
 mychain = BlockChain()
 mychain.create_genesis_block()
@@ -26,25 +27,52 @@ mypool = ModelPool()
 para_lock = Lock()
 mypara = ModelPara()
 
-# the address to other participating members of the network
+peers_lock = Lock()
 peers = set()
 
 # ========================================================================================
-# peer register related api
+# model para related api
 
-# endpoint to add new peers to the network. i.e. add new friends
-@app.route('/register_node', methods=['POST'])
-def register_new_peers():
-    node_address = request.get_json()["node_address"]
-    if not node_address:
-        return "Invalid data", 400
+# flush the pool and chain when we get a new seed
+# currently we did not use a knowledge transfer, just remove the old chain
+@app.route('/seed_update', methods=['POST'])
+def flush_chain():
+    global mypara
+    global mypool
+    global mychain
+    seed_msg = request.get_json()
+    if not valid_seed(seed_msg):
+        return "Invalid seed", 400
+    mypara.setPara(seed_msg)
+    mypool.clear()
+    mychain.clear()
+    mychain.create_genesis_block()
+    return "Reseeded the chain", 201
 
-    # Add the node to the peer list
-    peers.add(node_address)
+def valid_seed(msg):
+    # TODO check the seed sender is real admin
+    return True
 
-    # Return the consensus blockchain to the newly registered node
-    # so that he can sync
-    return get_chain()
+# ========================================================================================
+# peer registrations related api
+
+# comment this part because we only want the seed node to control your peer list
+# seems centralize but not a bid deal
+
+# # endpoint to add new peers to the network. i.e. add new friends
+# @app.route('/register_node', methods=['POST'])
+# def register_new_peers():
+#     global peers
+#     node_address = request.get_json()["node_address"]
+#     if not node_address:
+#         return "Invalid data", 400
+
+#     # Add the node to the peer list
+#     peers.add(node_address)
+
+#     # Return the consensus blockchain to the newly registered node
+#     # so that he can sync
+#     return get_chain()
 
 # i.e. ask myself to make friend with others (one another node)
 # will be changed to the automatic sync with seed node
@@ -66,11 +94,9 @@ def register_with_existing_node():
     response = requests.post(node_address + "/register_node",
                              data=json.dumps(data), headers=headers)
 
-    # TODO try to notify several peers simultaneously 
-
+    global mychain
+    global peers
     if response.status_code == 200:
-        global mychain
-        global peers
         # update chain and the peers
         chain_dump = response.json()['chain']
         mychain = create_chain_from_dump(chain_dump)
@@ -106,6 +132,8 @@ def create_chain_from_dump(chain_dump):
 def new_transaction(): 
     tx_data = request.get_json()
     required_fields = ["author", "content", "timestamp"]
+    # required_fields = list(LocalModel().__dict__.keys())  
+    # the tx should in consistence with our model packet structure 
 
     for field in required_fields:
         if not tx_data.get(field):
@@ -113,13 +141,22 @@ def new_transaction():
 
     global mypool
     if mypool.add(tx_data):
-        spread_tx_to_peers(tx_data) # TODO let a temporal thread to do the spread work
+        spread_tx_to_peers(tx_data) 
     
+    #  let a temporal thread to do the spread work to save time
+    thread = Thread(target=spread_tx_to_peers, args=[tx_data])
+    thread.start()
+
     return "Success", 201
 
 def spread_tx_to_peers(tx):
-    # TODO implement the spreading
-    pass
+    global peers
+    for peer in peers:
+        url = "{}new_transaction".format(peer)
+        headers = {'Content-Type': "application/json"}
+        requests.post(url,
+                      data=json.dumps(tx, sort_keys=True),
+                      headers=headers)
 
 # endpoint to query unconfirmed transactions
 @app.route('/pending_tx')
@@ -132,6 +169,7 @@ def get_pending_tx():
 
 @app.route('/chain', methods=['GET'])
 def get_chain():
+    global peers
     chain_data = []
     for block in mychain.chain:
         chain_data.append(block.__dict__)
@@ -157,6 +195,12 @@ def verify_and_add_block():
     if not added:
         return "The block was discarded by the node", 400
 
+    # remove the duplicate tx in the received block from my local pool
+    added_tx = set(map(lambda x: tuple(x.items()), block_data["transactions"])) # from list_of_dict to set_of_tuples, might remove this transition in the future
+    
+    global mypool
+    mypool.remove(added_tx)
+
     return "Block added to the chain", 201
 
 # ========================================================================================
@@ -167,18 +211,19 @@ def mine_unconfirmed_transactions():
 
     global mypool
     while True:
-        time.sleep(3)
-        print("i am trying mining")
-        result = mychain.mine(mypool.getPool())
-        if not result:
-            pass
-        else:
-            mypool.clear()
-            chain_length = len(mychain.chain)
-            consensus()
-            if chain_length == len(mychain.chain):
-                announce_new_block(mychain.last_block)
-            print("Block #{} is mined.".format(mychain.last_block.index))
+        time.sleep(BLOCK_GEN_INTERVAL)  # check the pool size per BGI
+        if mypool.size() >= POOL_MIN_THRESHOLD: # gen a new block when the size achieve our threshold
+            print("i am trying mining")
+            if mychain.mine(mypool.getPool()):
+                if consensus(): # i am the longest
+                    announce_new_block(mychain.last_block)
+                    mypool.clear()  # empty the pool once you finish your mine
+                    print("Block #{} is mined.".format(mychain.last_block.index))
+                else:
+                    print("get a longer chain from somewhere else")
+            else:
+                print("sth wrong with the embedded mine method in the chain object")
+
 
 def consensus():
     """
@@ -186,8 +231,10 @@ def consensus():
     found, our chain is replaced with it.
     """
     global mychain
+    global peers
 
-    longest_chain = mychain
+    am_i_the_longest = True
+    longest_chain = mychain.chain
     current_len = len(mychain.chain)
 
     for node in peers:
@@ -197,12 +244,11 @@ def consensus():
         if length > current_len and mychain.check_chain_validity(chain):
             current_len = length
             longest_chain = chain
+            am_i_the_longest = False
 
-    if longest_chain:
-        mychain = longest_chain
-        return True
+    mychain.chain = longest_chain
+    return am_i_the_longest
 
-    return False
 
     """
     TODO
@@ -217,6 +263,7 @@ def announce_new_block(block):
     Other blocks can simply verify the proof of work and add it to their
     respective chains.
     """
+    global peers
     for peer in peers:
         url = "{}add_block".format(peer)
         headers = {'Content-Type': "application/json"}
