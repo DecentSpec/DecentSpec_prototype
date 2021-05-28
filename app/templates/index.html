@@ -9,14 +9,15 @@
 	    <textarea name="content" rows="4" cols="50" placeholder="Just write whatever you want to..."></textarea>
 	    <br>
 	    <input type="text" name="author" placeholder="Your name">
+		<input type="text" name="port" placeholder="to which miner, 8000">
 	    <input type="submit" value="Post">
 	</form>
 	</center>
 
 	<br>
 
-	<a href="/"><button>Resync</button></a>
-
+	<a href="/"><button>Refresh</button></a>
+	<form action="/new_seed" id="newseed" method="post"><input type="submit" value="Flush BlockChain"></form>
 	<div style="margin: 20px;">
 
     {% for post in posts %}

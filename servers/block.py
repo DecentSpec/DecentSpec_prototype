@@ -54,7 +54,7 @@ class Block:
         """
         content = self.__dict__
         if 'global_model' in content:
-            content.pop('global_model') # remove the gobal_model cause it is lazy generated
+            content.pop('global_model') # remove the global_model cause it is lazy generated
         block_string = json.dumps(content, sort_keys=True)
         return sha256(block_string.encode()).hexdigest()
 
@@ -140,6 +140,8 @@ class BlockChain:
         result = True
         previous_hash = "0"
 
+        # check the model version of the chain first
+        # TODO the model version must the same with mine, before we really validate it
         for block in chain:
             block_hash = block.hash
             # remove the hash field to recompute the hash again
@@ -161,9 +163,6 @@ class BlockChain:
         transactions to the blockchain by adding them to the block
         and figuring out Proof Of Work.
         """
-        # unconfirmed_transactions = list(unconfirmed_transactions)
-        # map(lambda x: x.getModel(), unconfirmed_transactions)
-        # because set can not include dict, so we turn set into list and map each element in list from object to dict
         
         if not unconfirmed_transactions:
             return False

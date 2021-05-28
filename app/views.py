@@ -10,8 +10,10 @@ from app import app
 # The node with which our application interacts, there can be multiple
 # such nodes as well.
 CONNECTED_NODE_ADDRESS = "http://127.0.0.1:8000"
+ADDRESS = "http://127.0.0.1:"
 
 posts = []
+miner_list = ["8000"]
 
 
 def fetch_posts():
@@ -44,6 +46,23 @@ def index():
                            readable_time=timestamp_to_string)
 
 
+@app.route('/new_seed', methods=['POST'])
+def flush():    # a dummy flush
+    global miner_list
+    post_object = {
+        'name' : 'seed1',
+        'admin' : 'admin1',
+        'model' : 'model1',
+        'para' : 'para1',
+    }
+    for ports in miner_list:
+        requests.post(ADDRESS+ports+"/seed_update",
+                    json=post_object,
+                    headers={'Content-type': 'application/json'})
+    return redirect('/')
+
+
+
 @app.route('/submit', methods=['POST'])
 def submit_textarea():
     """
@@ -51,6 +70,10 @@ def submit_textarea():
     """
     post_content = request.form["content"]
     author = request.form["author"]
+    port = request.form["port"]
+    if port == "":
+        port = "8000"
+
     timestamp = time.time()
 
     post_object = {
@@ -60,7 +83,7 @@ def submit_textarea():
     }
 
     # Submit a transaction
-    new_tx_address = "{}/new_transaction".format(CONNECTED_NODE_ADDRESS)
+    new_tx_address = "{}/new_transaction".format(ADDRESS + port)
 
     requests.post(new_tx_address,
                   json=post_object,
