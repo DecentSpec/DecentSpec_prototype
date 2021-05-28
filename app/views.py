@@ -13,7 +13,7 @@ CONNECTED_NODE_ADDRESS = "http://127.0.0.1:8000"
 ADDRESS = "http://127.0.0.1:"
 
 posts = []
-miner_list = ["8000"]
+miner_list = ["8000","8001","8002"]
 
 
 def fetch_posts():
@@ -33,7 +33,6 @@ def fetch_posts():
         global posts
         posts = sorted(content, key=lambda k: k['timestamp'],
                        reverse=True)
-
 
 @app.route('/')
 def index():
@@ -61,7 +60,11 @@ def flush():    # a dummy flush
                     headers={'Content-type': 'application/json'})
     return redirect('/')
 
-
+@app.route('/miner_peers', methods=['GET'])
+def get_peers():
+    global miner_list
+    print(request.environ.get('REMOTE_PORT'))
+    return json.dumps(miner_list)
 
 @app.route('/submit', methods=['POST'])
 def submit_textarea():

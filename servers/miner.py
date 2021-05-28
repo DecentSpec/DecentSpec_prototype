@@ -2,9 +2,10 @@
 
 import json
 import time
+import sys
 from threading import Thread, Lock
 
-from flask import Flask, request
+from flask import Flask, request, current_app
 import requests
 
 from block import Block, BlockChain
@@ -12,6 +13,7 @@ from model import ModelPool, ModelPara, LocalModel, SeedingMsg
 
 BLOCK_GEN_INTERVAL = 3 # unit second
 POOL_MIN_THRESHOLD = 1
+SEED_ADDRESS = "http://127.0.0.1:5000"
 
 app = Flask(__name__)
 
@@ -29,7 +31,22 @@ para_lock = Lock()
 mypara = ModelPara()            # model descriptor, template and related paras
 
 peers_lock = Lock()
-peers = set()                   # peer miners list
+peers = set()
+PEER_PREADDR = "http://127.0.0.1:"
+myport = sys.argv[1]       # we save the port num from the command line
+
+def getPeers():
+    global peers
+    global myport
+    # Make a request to register with remote node and obtain information
+    response = requests.get(SEED_ADDRESS + "/miner_peers")
+    fulllist = response.json()
+    fulllist.remove(myport)
+    peers = set( map(lambda x: PEER_PREADDR+x+"/", fulllist) )
+    print("peers:")
+    print(peers)
+
+getPeers()
 
 # ========================================================================================
 # model para related api
@@ -38,6 +55,7 @@ peers = set()                   # peer miners list
 # currently we did not use a knowledge transfer, just remove the old chain
 @app.route('/seed_update', methods=['POST'])
 def flush_chain():
+    print("running at:")
     global mypara
     global mypool
     global mychain
@@ -141,12 +159,16 @@ def new_transaction():
             return "Invalid transaction data", 404
 
     global mypool
-    if mypool.add(tx_data):         # true when i have never add it before
-        spread_tx_to_peers(tx_data) 
-    
-    #  let a temporal thread to do the spread work to save time
-    thread = Thread(target=spread_tx_to_peers, args=[tx_data])
-    thread.start()
+
+    if "do_not_spread" in tx_data:      # if it is from some other miners
+        tx_data.pop("do_not_spread")
+        mypool.add(tx_data)             # just add to the pool and do not spread
+    else:                               # if it does not come from other miners
+        mypool.add(tx_data)
+        tx_data["do_not_spread"] = 1    # set the do not spread flag
+        #  let a temporal thread to do the spread work to save time
+        thread = Thread(target=spread_tx_to_peers, args=[tx_data])
+        thread.start()
 
     return "Success", 201
 
@@ -285,3 +307,6 @@ def announce_new_block(block):
 thread = Thread(name='mine_daemon', target=mine_unconfirmed_transactions)
 thread.setDaemon(True)  # auto stops when we shut down __main__
 thread.start()
+
+if __name__ == '__main__':
+    app.run(port=int(myport))

@@ -1,2 +1,3 @@
-export FLASK_APP=miner.py
-flask run --port 8000 &
+python miner.py 8000 &
+python miner.py 8001 &
+python miner.py 8002 &
