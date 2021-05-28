@@ -8,7 +8,7 @@ from flask import Flask, request
 import requests
 
 from block import Block, BlockChain
-from model import ModelPool, ModelPara, LocalModel
+from model import ModelPool, ModelPara, LocalModel, SeedingMsg
 
 BLOCK_GEN_INTERVAL = 3 # unit second
 POOL_MIN_THRESHOLD = 1
@@ -16,19 +16,20 @@ POOL_MIN_THRESHOLD = 1
 app = Flask(__name__)
 
 # global vars, together with their locks
-# TODO currently all operation is lock free, need add lock in the future
+# Very Important
+# TODO currently all operation is LOCK FREE, need add lock in the future
 bc_lock = Lock()
 mychain = BlockChain()
 mychain.create_genesis_block()
 
 pool_lock = Lock()
-mypool = ModelPool()
+mypool = ModelPool()            # candidate local models
 
 para_lock = Lock()
-mypara = ModelPara()
+mypara = ModelPara()            # model descriptor, template and related paras
 
 peers_lock = Lock()
-peers = set()
+peers = set()                   # peer miners list
 
 # ========================================================================================
 # model para related api
@@ -43,7 +44,7 @@ def flush_chain():
     seed_msg = request.get_json()
     if not valid_seed(seed_msg):
         return "Invalid seed", 400
-    mypara.setPara(seed_msg)
+    mypara.setPara(SeedingMsg(seed_msg))
     mypool.clear()
     mychain.clear()
     mychain.create_genesis_block()
@@ -140,7 +141,7 @@ def new_transaction():
             return "Invalid transaction data", 404
 
     global mypool
-    if mypool.add(tx_data):
+    if mypool.add(tx_data):         # true when i have never add it before
         spread_tx_to_peers(tx_data) 
     
     #  let a temporal thread to do the spread work to save time
@@ -166,6 +167,16 @@ def get_pending_tx():
 
 # ========================================================================================
 # mychain related api
+
+@app.route('/global_model', methods=['GET'])
+def get_global():
+    global mychain
+    global mypara
+    global_model = mychain.last_block().get_global()
+    gen = mychain.last_block().index
+    return json.dumps({ "global_model": global_model,
+                        "generation": gen,
+                        "seed": mypara.para.name})
 
 @app.route('/chain', methods=['GET'])
 def get_chain():
