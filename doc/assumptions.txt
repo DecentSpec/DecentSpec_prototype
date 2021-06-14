@@ -1,3 +1,5 @@
 for miner:
     1 currently ignore digital signature
     2 currently use flask builtin http server (low performance actually)
+    3 currently is permanent registration, leasing is to be implemented
+    4 currently no reward implementation - need add pub key gen module first

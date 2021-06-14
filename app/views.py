@@ -63,7 +63,6 @@ def flush():    # a dummy flush
 @app.route('/miner_peers', methods=['GET'])
 def get_peers():
     global miner_list
-    print(request.environ.get('REMOTE_PORT'))
     return json.dumps(miner_list)
 
 @app.route('/submit', methods=['POST'])
