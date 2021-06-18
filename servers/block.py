@@ -1,6 +1,6 @@
-from hashlib import sha256
 import json
 import time
+from myutils import genHash
 
 def mix(local_weights, aggr_para, base_model):
 
@@ -47,16 +47,14 @@ class Block:
         # model aggregation parameters
         self.aggr_para = aggr_para              # model aggregation parameters
 
+
     def compute_hash(self):
         """
         A function that return the hash of the block contents.
         the content do not include the lazy global model
         """
         content = self.__dict__
-        if 'global_model' in content:
-            content.pop('global_model') # remove the global_model cause it is lazy generated
-        block_string = json.dumps(content, sort_keys=True)
-        return sha256(block_string.encode()).hexdigest()
+        return genHash(content)
 
     def get_global(self):
         if self.global_model != None:
@@ -83,7 +81,7 @@ class BlockChain:
         the chain. The block has index 0, previous_hash as 0, and
         a valid hash.
         """
-        genesis_block = Block(0, [], 0, "0")
+        genesis_block = Block(0, [], 0, "genesisHash")
         genesis_block.hash = genesis_block.compute_hash()
         genesis_block.global_model = global_model
         self.chain.append(genesis_block)
@@ -125,15 +123,6 @@ class BlockChain:
         return True
 
     @classmethod
-    def is_valid_proof(cls, block, block_hash):
-        """
-        Check if block_hash is valid hash of block 
-        and satisfies the difficulty criteria.
-        """
-        return (block_hash.startswith('0' * cls.difficulty) and
-                block_hash == block.compute_hash())
-
-    @classmethod
     def proof_of_work(cls, block):
         """
         Function that tries different values of nonce to get a hash
@@ -149,26 +138,43 @@ class BlockChain:
         return computed_hash
 
     @classmethod
+    def is_valid_proof(cls, block, block_hash):
+        """
+        Check if block_hash is valid hash of block 
+        and satisfies the difficulty criteria.
+        """
+        if isinstance(block, Block):            # if it is an object
+            fresh_hash = block.compute_hash()
+            isGenesis = not block.index
+        else:
+            fresh_hash = genHash(block)         # if it is a dict block
+            isGenesis = not block["index"]      # genesis block do not have a valid nonce
+        
+        if isGenesis:
+            # print(block_hash == fresh_hash)
+            return block_hash == fresh_hash
+        else:
+            # print((block_hash.startswith('0' * cls.difficulty) and
+            #     block_hash == fresh_hash))
+            return (block_hash.startswith('0' * cls.difficulty) and
+                block_hash == fresh_hash)
+
+    @classmethod
     def check_chain_validity(cls, chain):
-        result = True
-        previous_hash = "0"
+        previous_hash = "genesisHash"
 
         # check the model version of the chain first
         # TODO the model version must the same with mine, before we really validate it
         for block in chain:
-            block_hash = block.hash
-            # remove the hash field to recompute the hash again
+            block_hash = block["hash"]
             # using `compute_hash` method.
-            delattr(block, "hash")
-
             if not cls.is_valid_proof(block, block_hash) or \
-                    previous_hash != block.previous_hash:
-                result = False
-                break
+                    previous_hash != block["previous_hash"]:
+                print("badchain: block #{} is invalid".format(block["index"]))
+                return False
+            previous_hash = block_hash
+        return True
 
-            block.hash, previous_hash = block_hash, block_hash
-
-        return result
 
     def mine(self, unconfirmed_transactions):
         """

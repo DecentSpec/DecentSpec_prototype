@@ -24,7 +24,6 @@ def reg_miner():
     global myMembers
     reg_data = request.get_json()
     myMembers.regNew(reg_data["name"], reg_data["addr"])
-    print("sending: " + " ".join(myMembers.getList()))
     return json.dumps(myMembers.getList())
 
 # ask this new seed to reseed the network
@@ -46,15 +45,17 @@ def flush():
     return "new seed injected", 200
 
 # another thread printing registered list periodically
-def myDaemon():
+def memberList():
     global myMembers
     while (True):
-        print("currently members: " + " ".join(myMembers.getList()))
-        time.sleep(3)
+        print("[t1] currently members:")
+        for i in range(myMembers.size):
+            print(myMembers.showMember(i))
+        time.sleep(5)
 
-t = threading.Thread(target=myDaemon)
-t.setDaemon(True)
-t.start()
+memListThread = threading.Thread(target=memberList)
+memListThread.setDaemon(True)
+memListThread.start()
 
 if __name__ == '__main__':
     seed.run(port=int(myport))

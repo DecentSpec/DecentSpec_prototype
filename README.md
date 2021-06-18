@@ -24,8 +24,11 @@ source run_all.sh
 ```
 
 current config:
+
 seednode    @ localhost:5000
+
 servernodes @ localhost:8000-8002
+
 viewer      @ localhost:5001
 
 xterm is needed.

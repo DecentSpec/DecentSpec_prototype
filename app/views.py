@@ -46,20 +46,10 @@ def index():
                            readable_time=timestamp_to_string)
 
 # ============================================ function migrated
-# @app.route('/new_seed', methods=['POST'])
-# def flush():    # a dummy flush
-#     global miner_list
-#     post_object = {
-#         'name' : 'seed1',
-#         'admin' : 'admin1',
-#         'model' : 'model1',
-#         'para' : 'para1',
-#     }
-#     for ports in miner_list:
-#         requests.post(ADDRESS+ports+"/seed_update",
-#                     json=post_object,
-#                     headers={'Content-type': 'application/json'})
-#     return redirect('/')
+@app.route('/new_seed', methods=['POST'])
+def flush():    # a dummy flush
+    requests.get(SEEDNODE_ADDRESS + "/new_seed")
+    return redirect('/')
 
 # @app.route('/miner_peers', methods=['GET'])
 # def get_peers():

@@ -15,6 +15,7 @@ from myutils import genName
 BLOCK_GEN_INTERVAL = 3 # unit second
 POOL_MIN_THRESHOLD = 1
 SEED_ADDRESS = "http://127.0.0.1:5000"
+REG_PERIOD = 9
 
 # seed id generation ============================================================
 app = Flask(__name__)
@@ -57,13 +58,14 @@ def register():
     # NOTICE: we ONLY give the new comer its peer list, 
     # the network will teach this new comer the model by concensus
 
-register()
+def regThread():
+    while True:
+        register()
+        time.sleep(REG_PERIOD)
 
 # ==============================================================================
 # seed flush related api
 
-# flush the pool and chain when we get a new seed
-# currently we did not use a knowledge transfer, just remove the old chain
 @app.route('/seed_update', methods=['POST'])
 def flush_chain():
     print("reseeding ...")
@@ -86,9 +88,6 @@ def valid_seed(msg):
 
 # ========================================================================================
 # mypool related api
-
-# endpoint to submit a new transaction. This will be used by
-# our application to add new data (posts) to the blockchain
 @app.route('/new_transaction', methods=['POST'])
 def new_transaction(): 
     tx_data = request.get_json()
@@ -164,6 +163,7 @@ def verify_and_add_block():
                   block_data["timestamp"],
                   block_data["previous_hash"],
                   block_data["nonce"])
+                # TODO block from dict to an object
 
     proof = block_data['hash']
     added = mychain.add_block(block, proof)
@@ -181,8 +181,6 @@ def verify_and_add_block():
 
 # ========================================================================================
 # the daemon thread for mining automatically
-
-# now we init the mine as a daemon thread
 # TODO use a SNAPSHOT/buffered mining to avoid fork!
 def mine_unconfirmed_transactions():
 
@@ -200,6 +198,24 @@ def mine_unconfirmed_transactions():
                     print("get a longer chain from somewhere else")
             else:
                 print("sth wrong with the embedded mine method in the chain object")
+                
+def create_list_from_dump(chain_dump):
+    chain = []
+    for idx, block_data in enumerate(chain_dump):
+        # print("convert the folowing dict into object")
+        # print(block_data)
+        block = Block(block_data["index"],
+                      block_data["transactions"],
+                      block_data["timestamp"],
+                      block_data["previous_hash"],
+                      block_data["nonce"],
+                      block_data["base_model"],
+                      block_data["miner"],
+                      block_data["difficulty"],
+                      block_data["aggr_para"])
+        block.hash = block_data["hash"]
+        chain.append(block)
+    return chain
 
 def consensus():
     """
@@ -215,11 +231,15 @@ def consensus():
 
     for node in peers:
         response = requests.get('{}/chain'.format(node))
-        length = response.json()['length']
-        chain = response.json()['chain']
+        data = response.json()
+        length = data['length']
+        chain = data['chain']
+        # NOTICE this chain is a list of dict NOT an object!!!
+        # print(length)
+        # print(chain)
         if length > current_len and mychain.check_chain_validity(chain):
             current_len = length
-            longest_chain = chain
+            longest_chain = create_list_from_dump(chain)
             am_i_the_longest = False
 
     mychain.chain = longest_chain
@@ -245,9 +265,13 @@ def announce_new_block(block):
                       data=json.dumps(block.__dict__, sort_keys=True),
                       headers=headers)
 
-thread = Thread(name='mine_daemon', target=mine_unconfirmed_transactions)
-thread.setDaemon(True)  # auto stops when we shut down __main__
-thread.start()
+mineThread = Thread(target=mine_unconfirmed_transactions)
+mineThread.setDaemon(True)  # auto stops when we shut down __main__
+mineThread.start()
+
+regThread = Thread(target=regThread)
+regThread.setDaemon(True)
+regThread.start()
 
 if __name__ == '__main__':
     app.run(port=int(myport))
