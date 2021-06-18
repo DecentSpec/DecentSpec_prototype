@@ -1,0 +1,1 @@
+xterm -T seednode -e python seed.py 5000 &

@@ -10,10 +10,11 @@ from app import app
 # The node with which our application interacts, there can be multiple
 # such nodes as well.
 CONNECTED_NODE_ADDRESS = "http://127.0.0.1:8000"
+SEEDNODE_ADDRESS = "http://127.0.0.1:5000"
 ADDRESS = "http://127.0.0.1:"
 
 posts = []
-miner_list = ["8000","8001","8002"]
+# miner_list = ["8000","8001","8002"]
 
 
 def fetch_posts():
@@ -44,26 +45,27 @@ def index():
                            node_address=CONNECTED_NODE_ADDRESS,
                            readable_time=timestamp_to_string)
 
+# ============================================ function migrated
+# @app.route('/new_seed', methods=['POST'])
+# def flush():    # a dummy flush
+#     global miner_list
+#     post_object = {
+#         'name' : 'seed1',
+#         'admin' : 'admin1',
+#         'model' : 'model1',
+#         'para' : 'para1',
+#     }
+#     for ports in miner_list:
+#         requests.post(ADDRESS+ports+"/seed_update",
+#                     json=post_object,
+#                     headers={'Content-type': 'application/json'})
+#     return redirect('/')
 
-@app.route('/new_seed', methods=['POST'])
-def flush():    # a dummy flush
-    global miner_list
-    post_object = {
-        'name' : 'seed1',
-        'admin' : 'admin1',
-        'model' : 'model1',
-        'para' : 'para1',
-    }
-    for ports in miner_list:
-        requests.post(ADDRESS+ports+"/seed_update",
-                    json=post_object,
-                    headers={'Content-type': 'application/json'})
-    return redirect('/')
-
-@app.route('/miner_peers', methods=['GET'])
-def get_peers():
-    global miner_list
-    return json.dumps(miner_list)
+# @app.route('/miner_peers', methods=['GET'])
+# def get_peers():
+#     global miner_list
+#     return json.dumps(miner_list)
+# ============================================= function migrated
 
 @app.route('/submit', methods=['POST'])
 def submit_textarea():

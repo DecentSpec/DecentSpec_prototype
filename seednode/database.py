@@ -23,8 +23,9 @@ class MinerDB:
 
     def regNew(self, key, addr, role="miner"):
         self.key.append(key)
-        self.key.append(addr)
+        self.addr.append(addr)
         self.role.append(role)
+        return 0
 
     def tick(self):
         pass

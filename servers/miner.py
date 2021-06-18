@@ -10,14 +10,22 @@ import requests
 
 from block import Block, BlockChain
 from model import ModelPool, ModelPara, LocalModel, SeedingMsg
+from myutils import genName
 
 BLOCK_GEN_INTERVAL = 3 # unit second
 POOL_MIN_THRESHOLD = 1
 SEED_ADDRESS = "http://127.0.0.1:5000"
 
+# seed id generation ============================================================
 app = Flask(__name__)
+myport = sys.argv[1]       # we save the port num from the command line
+myaddr = "http://127.0.0.1:" + myport
+myname = genName()
+if (len(sys.argv) > 2):
+    SEED_ADDRESS = sys.argv[2]
+    print("seed is " + SEED_ADDRESS)
 
-# global vars, together with their locks
+# global vars, together with their locks ========================================
 # Very Important
 # TODO currently all operation is LOCK FREE, need add lock in the future
 bc_lock = Lock()
@@ -32,30 +40,33 @@ mypara = ModelPara()            # model descriptor, template and related paras
 
 peers_lock = Lock()
 peers = set()
-PEER_PREADDR = "http://127.0.0.1:"
-myport = sys.argv[1]       # we save the port num from the command line
 
-def getPeers():
+# register to seed node, might repeat in the future ============================
+def register():
     global peers
     global myport
     # Make a request to register with remote node and obtain information
-    response = requests.get(SEED_ADDRESS + "/miner_peers")
-    fulllist = response.json()
-    fulllist.remove(myport)
-    peers = set( map(lambda x: PEER_PREADDR+x+"/", fulllist) )
+    data = {"name": myname, "addr": myaddr}
+    headers = {'Content-Type': "application/json"}
+    response = requests.post(SEED_ADDRESS + "/register", 
+                            data=json.dumps(data), headers=headers)
+    peers = set(response.json())
+    peers.remove(myaddr)
     print("peers:")
     print(peers)
+    # NOTICE: we ONLY give the new comer its peer list, 
+    # the network will teach this new comer the model by concensus
 
-getPeers()
+register()
 
-# ========================================================================================
-# model para related api
+# ==============================================================================
+# seed flush related api
 
 # flush the pool and chain when we get a new seed
 # currently we did not use a knowledge transfer, just remove the old chain
 @app.route('/seed_update', methods=['POST'])
 def flush_chain():
-    print("running at:")
+    print("reseeding ...")
     global mypara
     global mypool
     global mychain
@@ -65,82 +76,13 @@ def flush_chain():
     mypara.setPara(SeedingMsg(seed_msg))
     mypool.clear()
     mychain.clear()
-    mychain.create_genesis_block(None) # TODO extract the global model seed from seed msg
+    mychain.create_genesis_block(None) 
+    # TODO extract the global model seed from seed msg
     return "Reseeded the chain", 201
 
 def valid_seed(msg):
     # TODO check the seed sender is real admin
     return True
-
-# ========================================================================================
-# peer registrations related api
-
-# comment this part because we only want the seed node to control your peer list
-# seems centralize but not a bid deal
-
-# # endpoint to add new peers to the network. i.e. add new friends
-# @app.route('/register_node', methods=['POST'])
-# def register_new_peers():
-#     global peers
-#     node_address = request.get_json()["node_address"]
-#     if not node_address:
-#         return "Invalid data", 400
-
-#     # Add the node to the peer list
-#     peers.add(node_address)
-
-#     # Return the consensus blockchain to the newly registered node
-#     # so that he can sync
-#     return get_chain()
-
-# i.e. ask myself to make friend with others (one another node)
-# will be changed to the automatic sync with seed node
-@app.route('/register_with', methods=['POST'])
-def register_with_existing_node():
-    """
-    Internally calls the `register_node` endpoint to
-    register current node with the node specified in the
-    request, and sync the blockchain as well as peer data.
-    """
-    node_address = request.get_json()["node_address"]
-    if not node_address:
-        return "Invalid data", 400
-
-    data = {"node_address": request.host_url}
-    headers = {'Content-Type': "application/json"}
-
-    # Make a request to register with remote node and obtain information
-    response = requests.post(node_address + "/register_node",
-                             data=json.dumps(data), headers=headers)
-
-    global mychain
-    global peers
-    if response.status_code == 200:
-        # update chain and the peers
-        chain_dump = response.json()['chain']
-        mychain = create_chain_from_dump(chain_dump)
-        peers.update(response.json()['peers'])
-        return "Registration successful", 200
-    else:
-        # if something goes wrong, pass it on to the API response
-        return response.content, response.status_code
-
-def create_chain_from_dump(chain_dump):
-    generated_blockchain = BlockChain()
-    generated_blockchain.create_genesis_block()
-    for idx, block_data in enumerate(chain_dump):
-        if idx == 0:
-            continue  # skip genesis block
-        block = Block(block_data["index"],
-                      block_data["transactions"],
-                      block_data["timestamp"],
-                      block_data["previous_hash"],
-                      block_data["nonce"])
-        proof = block_data['hash']
-        added = generated_blockchain.add_block(block, proof)
-        if not added:
-            raise Exception("The chain dump is tampered!!")
-    return generated_blockchain
 
 # ========================================================================================
 # mypool related api
@@ -176,7 +118,7 @@ def new_transaction():
 def spread_tx_to_peers(tx):
     global peers
     for peer in peers:
-        url = "{}new_transaction".format(peer)
+        url = "{}/new_transaction".format(peer)
         headers = {'Content-Type': "application/json"}
         requests.post(url,
                       data=json.dumps(tx, sort_keys=True),
@@ -259,8 +201,6 @@ def mine_unconfirmed_transactions():
             else:
                 print("sth wrong with the embedded mine method in the chain object")
 
-
-
 def consensus():
     """
     Our naive consensus algorithm. If a longer valid chain is
@@ -274,7 +214,7 @@ def consensus():
     current_len = len(mychain.chain)
 
     for node in peers:
-        response = requests.get('{}chain'.format(node))
+        response = requests.get('{}/chain'.format(node))
         length = response.json()['length']
         chain = response.json()['chain']
         if length > current_len and mychain.check_chain_validity(chain):
@@ -284,8 +224,6 @@ def consensus():
 
     mychain.chain = longest_chain
     return am_i_the_longest
-
-
     """
     TODO
     Neutrino:
@@ -301,7 +239,7 @@ def announce_new_block(block):
     """
     global peers
     for peer in peers:
-        url = "{}add_block".format(peer)
+        url = "{}/add_block".format(peer)
         headers = {'Content-Type': "application/json"}
         requests.post(url,
                       data=json.dumps(block.__dict__, sort_keys=True),
