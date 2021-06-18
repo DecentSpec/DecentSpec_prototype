@@ -47,12 +47,17 @@ class MinerDB:
     def tick(self):
         while True:
             self.timer = list(map(lambda x:x-1, self.timer))
-            for i in range(len(self.timer)):
+            # TODO a small bug here
+            # can not use for to 
+            i = 0
+            while i < self.size:
                 if self.timer[i] < 0:
                     self.key.pop(i)
                     self.addr.pop(i)
                     self.role.pop(i)
                     self.timer.pop(i)
+                else:
+                    i = i + 1
             time.sleep(LEASING_RATE) 
 
     def __runTick(self):    # we do not use it currently
