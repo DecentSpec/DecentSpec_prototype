@@ -1,6 +1,6 @@
 # BCxFL for DecentSpct Project
 
-run the dummy seed node:
+run the seed node:
 ```sh
 cd seednode
 source run_seed.sh
