@@ -31,4 +31,6 @@ servernodes @ localhost:8000-8002
 
 viewer      @ localhost:5001
 
+Then you can play with the blockchain opening http://127.0.0.1:5001 in your browser
+
 xterm is needed.
