@@ -1,4 +1,7 @@
 import torch
+import datetime
+import time
+
 # what you get from state_dict() is an list with tensor
 # tensor can not be directly serialized
 def dict2tensor(myDict):
@@ -19,3 +22,10 @@ def save_weights_into_dict(model):
 
 def load_weights_from_dict(model, weights):
     model.load_state_dict(dict2tensor(weights))
+
+def genName(num=10):
+    salt = ''.join(random.sample(string.ascii_letters + string.digits, num))
+    return salt
+
+def genTimestamp():
+    return datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')

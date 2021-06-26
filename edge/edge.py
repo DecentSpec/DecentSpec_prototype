@@ -1,16 +1,18 @@
 import requests
 import json
 import jsonpickle
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from myutils import save_weights_into_dict, load_weights_from_dict
+from myutils import save_weights_into_dict, load_weights_from_dict, genName, genTimestamp
 # TODO use TorchScript to serialize the model class
 from model import SharedModel
 
 SEED_ADDR = "http://127.0.0.1:5000"
 LOCAL_DATASET = "GPS-power.dat"     # data structure 
+myName = genName()
 
 class DataFeeder:                   # emulate each round dataset feeder
     def __init__(self, filePath):
@@ -48,10 +50,9 @@ class DataFeeder:                   # emulate each round dataset feeder
         # does this emulator have further dataset
 
 def fetchList(addr):
-    # request to SEED_ADDR
-    # reorder by the ping latency
-    # TODO change to real
-    return ["http://127.0.0.1:8000"]
+    response = requests.get("{}/miner_peers".format(addr))
+    data = response.content
+    return data
 
 def getLatest(addr):
     response = requests.get("{}/get_global".format(addr))
@@ -59,10 +60,17 @@ def getLatest(addr):
     return data['weight'], data['preprocPara'], data['trainPara']
 
 def pushTrained(size, loss, weight, addr):
-    data = {
+    MLdata = {
         'stat' : {  'size' : size,
                     'loss' : loss,},
         'weight' : weight
+    }
+    global myName
+    data = {
+        'author' : myName,
+        'content' : MLdata,
+        'timestamp' : genTimestamp(),
+        'type' : 'localModelWeight',
     }
     requests.post(  addr + '/new_transaction',
                     json=data,
@@ -72,7 +80,7 @@ def pushTrained(size, loss, weight, addr):
 class getDataSet(torch.utils.data.Dataset):
     def __init__(self, myList):
         self.myList = myList
-    
+
     def __getitem__(self, index):
         row = self.myList[index]
         gps_tensor = torch.tensor([row[0], row[1]])
@@ -107,7 +115,7 @@ def localTraining(model, data, para):
             loss.backward()
             optimizer.step()
             loss_sum += loss.item()
-        print(f"[epoch {ep+1}]\t[avg loss]\t{loss_sum/i}")
+        # print(f"[epoch {ep+1}]\t[avg loss]\t{loss_sum/i}")
     return size, loss_sum/i, save_weights_into_dict(model)
 
 # emulator local init =======================================

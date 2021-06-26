@@ -9,7 +9,7 @@ from flask import Flask, request, current_app
 import requests
 
 from block import Block, BlockChain
-from model import ModelPool, ModelPara, LocalModel, SeedingMsg
+from model import ModelPool
 from myutils import genName
 
 BLOCK_GEN_INTERVAL = 3 # unit second
@@ -17,7 +17,7 @@ POOL_MIN_THRESHOLD = 1
 SEED_ADDRESS = "http://127.0.0.1:5000"
 REG_PERIOD = 9
 
-# seed id generation ============================================================
+# miner id generation ===========================================================
 app = Flask(__name__)
 myport = sys.argv[1]       # we save the port num from the command line
 myaddr = "http://127.0.0.1:" + myport
@@ -30,28 +30,29 @@ if (len(sys.argv) > 2):
 # Very Important
 # TODO currently all operation is LOCK FREE, need add lock in the future
 bc_lock = Lock()
-mychain = BlockChain()
-mychain.create_genesis_block(None)
+mychain = BlockChain(myname)
 
 pool_lock = Lock()
 mypool = ModelPool()            # candidate local models
 
-para_lock = Lock()
-mypara = ModelPara()            # model descriptor, template and related paras
-
 peers_lock = Lock()
 peers = set()
+
+# TODO add status machine to miner
 
 # register to seed node, might repeat in the future ============================
 def register():
     global peers
     global myport
+    global mychain
+    global myname
     # Make a request to register with remote node and obtain information
     data = {"name": myname, "addr": myaddr}
     headers = {'Content-Type': "application/json"}
     response = requests.post(SEED_ADDRESS + "/register", 
                             data=json.dumps(data), headers=headers)
-    peers = set(response.json())
+    peers = set(response.json()['list'])
+    mychain.create_genesis_block(response.json()['seedWeight'], response.json()['para'])
     peers.remove(myaddr)
     print("peers:")
     print(peers)
@@ -75,10 +76,9 @@ def flush_chain():
     seed_msg = request.get_json()
     if not valid_seed(seed_msg):
         return "Invalid seed", 400
-    mypara.setPara(SeedingMsg(seed_msg))
     mypool.clear()
     mychain.clear()
-    mychain.create_genesis_block(None) 
+    mychain.create_genesis_block(seed_msg['seedWeight'], seed_msg['para'])
     # TODO extract the global model seed from seed msg
     return "Reseeded the chain", 201
 
@@ -92,7 +92,6 @@ def valid_seed(msg):
 def new_transaction(): 
     tx_data = request.get_json()
     required_fields = ["author", "content", "timestamp"]
-    # required_fields = list(LocalModel().__dict__.keys())  
 
     # TODO the tx should in consistence with our model packet structure and within certain generation of the model
 
@@ -135,12 +134,15 @@ def get_pending_tx():
 @app.route('/global_model', methods=['GET'])
 def get_global():
     global mychain
-    global mypara
-    global_model = mychain.last_block().get_global()
-    gen = mychain.last_block().index
-    return json.dumps({ "global_model": global_model,
+    global_model = mychain.last_block.get_global()
+    preprocPara = mychain.last_block.aggr_para["preprocPara"]
+    trainPara = mychain.last_block.aggr_para["trainPara"]
+    gen = mychain.last_block.index
+    return json.dumps({ "weight": global_model,
                         "generation": gen,
-                        "seed": mypara.para.name})
+                        "preprocPara" : preprocPara,
+                        "trainPara" : trainPara,
+                        })
 
 @app.route('/chain', methods=['GET'])
 def get_chain():
@@ -162,6 +164,10 @@ def verify_and_add_block():
                   block_data["transactions"],
                   block_data["timestamp"],
                   block_data["previous_hash"],
+                  block_data["base_model"],
+                  block_data["miner"],
+                  block_data["difficulty"],
+                  block_data["aggr_para"],
                   block_data["nonce"])
                 # TODO block from dict to an object
 
@@ -208,11 +214,11 @@ def create_list_from_dump(chain_dump):
                       block_data["transactions"],
                       block_data["timestamp"],
                       block_data["previous_hash"],
-                      block_data["nonce"],
                       block_data["base_model"],
                       block_data["miner"],
                       block_data["difficulty"],
-                      block_data["aggr_para"])
+                      block_data["aggr_para"],
+                      block_data["nonce"])
         block.hash = block_data["hash"]
         chain.append(block)
     return chain

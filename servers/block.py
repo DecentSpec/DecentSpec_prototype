@@ -1,34 +1,37 @@
 import json
 import time
-from myutils import genHash
+from myutils import genHash, genTimestamp, dict2tensor, tensor2dict
 
-def mix(local_weights, aggr_para, base_model):
+def mix(transactions, aggr_para, base_model):
 
     # uncomment it when edge device implemented
 
-    # alpha = aggr_para.alpha
-    # training_num = 0
-    # for idx in range(len(local_weights)):
-    #     (sample_num, averaged_params) = local_weights[idx]
-    #     training_num += sample_num
+    alpha = aggr_para['alpha']
+    local_weights = []
+    training_num = 0
+    for tx in transactions:
+        if tx['type'] == 'localModelWeight':
+            MLdata = tx['MLdata']
+            size = MLdata['stat']['size']
+            training_num += size
+            weight = MLdata['weight']
+            local_weights.append( (size, dict2tensor(weight)) )
 
-    # (sample_num, averaged_params) = local_weights[0]
-    # for k in averaged_params.keys():                                                        # for each parameter in a model
-    #     for i in range(0, len(local_weights)):
-    #         local_sample_number, local_model_params = local_weights[i]
-    #         w = local_sample_number / training_num
-    #         if i == 0:
-    #             averaged_params[k] = local_model_params[k] * w
-    #         else:
-    #             averaged_params[k] += local_model_params[k] * w                             # dataset size-weighted average
-    #     averaged_params[k] = (1-alpha) * base_model[k] + alpha * averaged_params[k]      # EWMA
-    # return averaged_params
-
-    return None
+    averaged_params = {}
+    for k in local_weights[0].keys():                                                        # for each parameter in a model
+        for i in range(0, len(local_weights)):
+            local_sample_number, local_model_params = local_weights[i]
+            w = local_sample_number / training_num
+            if i == 0:
+                averaged_params[k] = local_model_params[k] * w
+            else:
+                averaged_params[k] += local_model_params[k] * w                             # dataset size-weighted average
+        averaged_params[k] = (1-alpha) * base_model[k] + alpha * averaged_params[k]      # EWMA
+    return tensor2dict(averaged_params)
 
 class Block:
-    def __init__(self, index, transactions, timestamp, previous_hash, nonce=0, \
-                base_model=None, miner="anonymous", difficulty=2, aggr_para=None):     # TODO, add those new arguments
+    def __init__(self, index, transactions, timestamp, previous_hash,  \
+                base_model, miner, difficulty, aggr_para, nonce=0,):     # TODO, add those new arguments
         
         # model update list, all those local weights
         self.transactions = transactions
@@ -42,11 +45,10 @@ class Block:
         self.previous_hash = previous_hash      # hash of previous block
         self.nonce = nonce                      # nonce
         self.miner = miner                      # miner's public key
-        self.difficulty = difficulty            # difficulty
 
-        # model aggregation parameters
-        self.aggr_para = aggr_para              # model aggregation parameters
-
+        # some inherit constants
+        self.aggr_para = aggr_para              # model aggregation parameters together with training para
+        self.difficulty = difficulty            # difficulty, actually this field is not used
 
     def compute_hash(self):
         """
@@ -59,7 +61,7 @@ class Block:
     def get_global(self):
         if self.global_model != None:
             return self.global_model
-        if self.transactions == None or self.aggr_para == None:
+        if self.transactions == None:
             return None
         return mix(self.transactions, self.aggr_para, self.base_model)
 
@@ -69,24 +71,28 @@ class BlockChain:
     # currently it is fixed, but we will make it modifiable TODO
     difficulty = 3
 
-    def __init__(self):
+    def __init__(self, name):
         self.chain = []
+        self.name = name
     
     def clear(self):
         self.chain = []
 
-    def create_genesis_block(self, global_model):
+    def create_genesis_block(self, global_model, aggr_para):
         """
         A function to generate genesis block and appends it to
         the chain. The block has index 0, previous_hash as 0, and
         a valid hash.
         """
-        genesis_block = Block(0, [], 0, "genesisHash")
+        genesis_block = Block(  0, [], genTimestamp(), "genesisHash", 
+                                base_model={},
+                                miner=self.name,
+                                difficulty=BlockChain.difficulty,
+                                aggr_para=aggr_para)
         genesis_block.hash = genesis_block.compute_hash()
         genesis_block.global_model = global_model
         self.chain.append(genesis_block)
-        print("first block hash")
-        print(genesis_block.hash)
+        print("first block hash: {}".format(genesis_block.hash))
 
     @property
     def last_block(self):
@@ -191,10 +197,15 @@ class BlockChain:
         new_block = Block(index=last_block.index + 1,
                           transactions=unconfirmed_transactions,
                           timestamp=time.time(),
-                          previous_hash=last_block.hash)
+                          previous_hash=last_block.hash,
+                          miner=self.name,
+                          base_model=self.last_block.get_global(),
+                          difficulty=self.last_block.difficulty,
+                          aggr_para=self.last_block.aggr_para
+                          )
 
         proof = self.proof_of_work(new_block)
-
+    
         self.add_block(new_block, proof)
 
         # do not forget to empty the pool in outside context
