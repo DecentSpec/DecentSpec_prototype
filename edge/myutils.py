@@ -1,6 +1,8 @@
 import torch
 import datetime
 import time
+import random
+import string
 
 # what you get from state_dict() is an list with tensor
 # tensor can not be directly serialized
@@ -28,4 +30,4 @@ def genName(num=10):
     return salt
 
 def genTimestamp():
-    return datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')
+    return time.time()

@@ -1,8 +1,8 @@
 import random
 import time
-import datetime
 import string
 import json
+import torch
 from hashlib import sha256
 
 def genName(num=10):
@@ -20,7 +20,7 @@ def genHash(content):               # generate hash from block dict
     return sha256(block_string.encode()).hexdigest()
 
 def genTimestamp():
-    return datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')
+    return time.time()
 
 def dict2tensor(myDict):
     myWeight = {}

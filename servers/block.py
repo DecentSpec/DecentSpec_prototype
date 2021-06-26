@@ -2,6 +2,8 @@ import json
 import time
 from myutils import genHash, genTimestamp, dict2tensor, tensor2dict
 
+DIFF=2
+
 def mix(transactions, aggr_para, base_model):
 
     # uncomment it when edge device implemented
@@ -11,14 +13,20 @@ def mix(transactions, aggr_para, base_model):
     training_num = 0
     for tx in transactions:
         if tx['type'] == 'localModelWeight':
-            MLdata = tx['MLdata']
+            MLdata = tx['content']
             size = MLdata['stat']['size']
             training_num += size
             weight = MLdata['weight']
             local_weights.append( (size, dict2tensor(weight)) )
-
+    
+    # print("local weights:")
+    # print(local_weights)
+    # print("base model:")
+    # print(base_model)
+    if len(local_weights) < 1:
+        return None
     averaged_params = {}
-    for k in local_weights[0].keys():                                                        # for each parameter in a model
+    for k in local_weights[0][1].keys():                      # for each parameter in a model
         for i in range(0, len(local_weights)):
             local_sample_number, local_model_params = local_weights[i]
             w = local_sample_number / training_num
@@ -27,6 +35,8 @@ def mix(transactions, aggr_para, base_model):
             else:
                 averaged_params[k] += local_model_params[k] * w                             # dataset size-weighted average
         averaged_params[k] = (1-alpha) * base_model[k] + alpha * averaged_params[k]      # EWMA
+    # print("avged weights:")
+    # print(averaged_params)
     return tensor2dict(averaged_params)
 
 class Block:
@@ -62,14 +72,17 @@ class Block:
         if self.global_model != None:
             return self.global_model
         if self.transactions == None:
-            return None
-        return mix(self.transactions, self.aggr_para, self.base_model)
-
+            return self.base_model
+        mixed = mix(self.transactions, self.aggr_para, dict2tensor(self.base_model))
+        if mixed:
+            return mixed
+        else:
+            return self.base_model
 
 class BlockChain:
     # difficulty of our PoW algorithm
     # currently it is fixed, but we will make it modifiable TODO
-    difficulty = 3
+    difficulty = DIFF
 
     def __init__(self, name):
         self.chain = []

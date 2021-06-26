@@ -37,7 +37,7 @@ Para = {
 @seed.route('/miner_peers', methods=['GET'])
 def get_peers():
     global myMembers
-    return json.dumps(myMembers.getList())
+    return json.dumps({'peers' : myMembers.getList()})
 
 @seed.route('/register', methods=['POST'])
 def reg_miner():
@@ -50,6 +50,9 @@ def reg_miner():
         'seedWeight' : save_weights_into_dict(seedModel),
         'para' : Para,
     }
+    # print(ret)
+    # print("reged a new node")
+    # print(ret["para"])
     return json.dumps(ret)
 
 # ask this new seed to reseed the network

@@ -15,7 +15,7 @@ from myutils import genName
 BLOCK_GEN_INTERVAL = 3 # unit second
 POOL_MIN_THRESHOLD = 1
 SEED_ADDRESS = "http://127.0.0.1:5000"
-REG_PERIOD = 9
+REG_PERIOD = 19
 
 # miner id generation ===========================================================
 app = Flask(__name__)
@@ -38,6 +38,13 @@ mypool = ModelPool()            # candidate local models
 peers_lock = Lock()
 peers = set()
 
+status_lock = Lock()
+mystatus = False
+
+mypara = None
+seedWeight = None
+
+
 # TODO add status machine to miner
 
 # register to seed node, might repeat in the future ============================
@@ -46,23 +53,38 @@ def register():
     global myport
     global mychain
     global myname
+    global seedWeight
+    global mypara
+    global mystatus
     # Make a request to register with remote node and obtain information
     data = {"name": myname, "addr": myaddr}
     headers = {'Content-Type': "application/json"}
     response = requests.post(SEED_ADDRESS + "/register", 
                             data=json.dumps(data), headers=headers)
     peers = set(response.json()['list'])
-    mychain.create_genesis_block(response.json()['seedWeight'], response.json()['para'])
+    seedWeight = response.json()['seedWeight']
+    mypara = response.json()['para']
+    mystatus = True
     peers.remove(myaddr)
-    print("peers:")
-    print(peers)
+    # print("peers:")
+    # print(peers)
     # NOTICE: we ONLY give the new comer its peer list, 
     # the network will teach this new comer the model by concensus
+
 
 def regThread():
     while True:
         register()
         time.sleep(REG_PERIOD)
+
+regThread = Thread(target=regThread)
+regThread.setDaemon(True)
+regThread.start()
+
+print("wait for registration ...")
+while not mystatus:
+    pass
+mychain.create_genesis_block(seedWeight, mypara)
 
 # ==============================================================================
 # seed flush related api
@@ -73,13 +95,16 @@ def flush_chain():
     global mypara
     global mypool
     global mychain
+    global mypara
+    global seedWeight
     seed_msg = request.get_json()
     if not valid_seed(seed_msg):
         return "Invalid seed", 400
     mypool.clear()
     mychain.clear()
-    mychain.create_genesis_block(seed_msg['seedWeight'], seed_msg['para'])
-    # TODO extract the global model seed from seed msg
+    seedWeight = seed_msg['seedWeight']
+    mypara = seed_msg['para']
+    mychain.create_genesis_block(seedWeight, mypara)
     return "Reseeded the chain", 201
 
 def valid_seed(msg):
@@ -150,9 +175,32 @@ def get_chain():
     chain_data = []
     for block in mychain.chain:
         chain_data.append(block.__dict__)
-    return json.dumps({"length": len(chain_data),
+    data = json.dumps({"length": len(chain_data),
                        "chain": chain_data,
-                       "peers": list(peers)})
+                       })
+    return data
+
+@app.route('/chain_print', methods=['GET']) # API for viewer
+def get_chain_print():
+    global peers
+    chain_data = []
+    for block in mychain.chain:     # rewrite the block contents to shrink weights
+        blockData = block.__dict__.copy()
+        blockData["transactions"] = []
+        for tx in block.transactions:
+            if tx["type"] == "text":
+                blockData["transactions"].append(tx)
+            elif tx["type"] == "localModelWeight":
+                shrinked_tx = tx.copy()
+                shrinked_tx["content"] = "it is one local weights"
+                blockData["transactions"].append(shrinked_tx)
+            else:
+                print("unrecognized tx type " + tx["type"])
+        chain_data.append(blockData)
+    data = json.dumps({"length": len(chain_data),
+                       "chain": chain_data,
+                       })
+    return data
 
 # endpoint to add a block mined by someone else to
 # the node's chain. The block is first verified by the node
@@ -178,7 +226,7 @@ def verify_and_add_block():
         return "The block was discarded by the node", 400
 
     # remove the duplicate tx in the received block from my local pool
-    added_tx = set(map(lambda x: tuple(x.items()), block_data["transactions"])) # from list_of_dict to set_of_tuples, might remove this transition in the future
+    added_tx = set(map(lambda x: json.dumps(x, sort_keys=True), block_data["transactions"])) # from list_of_dict to set_of_tuples, might remove this transition in the future
     
     global mypool
     mypool.remove(added_tx)
@@ -198,8 +246,10 @@ def mine_unconfirmed_transactions():
             if mychain.mine(mypool.getPool()):  # TODO mine should be interrupt when receive a seed_update flush
                 if consensus(): # i am the longest
                     announce_new_block(mychain.last_block)
-                    mypool.clear()  # empty the pool once you finish your mine
+                    added_tx = set(map(lambda x: json.dumps(x, sort_keys=True), mychain.last_block.transactions))
+                    mypool.remove(added_tx)  # empty the pool once you finish your mine
                     print("Block #{} is mined.".format(mychain.last_block.index))
+                    # print(mychain.last_block.__dict__)
                 else:
                     print("get a longer chain from somewhere else")
             else:
@@ -274,10 +324,6 @@ def announce_new_block(block):
 mineThread = Thread(target=mine_unconfirmed_transactions)
 mineThread.setDaemon(True)  # auto stops when we shut down __main__
 mineThread.start()
-
-regThread = Thread(target=regThread)
-regThread.setDaemon(True)
-regThread.start()
 
 if __name__ == '__main__':
     app.run(port=int(myport))

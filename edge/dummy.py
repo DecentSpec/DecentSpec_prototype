@@ -42,7 +42,7 @@ def uploadLocal():
                                      dict2tensor(data['weight'])))  # so change to tensor temporarily
     return "success", 201
 
-@app.route('/get_global', methods=['GET'])
+@app.route('/global_model', methods=['GET'])
 def getGlobal():
     global globalWeight
     global preprocPara

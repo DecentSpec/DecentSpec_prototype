@@ -1,12 +1,13 @@
+import json
 class ModelPool:
     def __init__(self):
         self.pool = set()
 
     def getPool(self):      # return a list of dict 
-        return list( map(lambda x: dict(x), self.pool) )
+        return list( map(lambda x: json.loads(x), self.pool) )
 
     def add(self, model):   # send in a dict and convert it to tuple to include it into the set
-        t = tuple(model.items())
+        t = json.dumps(model, sort_keys=True)
         if t in self.pool:  # if i already have this tx, return False
             # TODO try to use hash to boost compare
             print("I already have this tx")

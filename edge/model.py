@@ -5,16 +5,20 @@
 
 import torch.nn as nn
 import torch.nn.functional as F
+
+# NUM_NEU = 2
+NUM_NEU = 50
+
 class SharedModel(nn.Module):
 
     # parameter-related operation is defined in init as nn
     def __init__(self):
         super(SharedModel, self).__init__()
         # input of network is a 2-dimensional feature(latitude, longitude)
-        self.il = nn.Linear(2,50)  # inputlayer 
-        self.hl1 = nn.Linear(50,50) # hiddenlayer 1
-        self.hl2 = nn.Linear(50,50) # hiddenlayer 2
-        self.ol = nn.Linear(50,1)   # outputlayer
+        self.il = nn.Linear(2,NUM_NEU)  # inputlayer 
+        self.hl1 = nn.Linear(NUM_NEU,NUM_NEU) # hiddenlayer 1
+        self.hl2 = nn.Linear(NUM_NEU,NUM_NEU) # hiddenlayer 2
+        self.ol = nn.Linear(NUM_NEU,1)   # outputlayer
 
     # parameter-irrelative operation is recommended as function
     def forward(self, x): # input x is the 2-dimensional spatial coordinates

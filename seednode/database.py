@@ -9,7 +9,7 @@ from threading import Thread, Lock
 import time
 
 LEASING_RATE = 1    # rate of leasing timer reduction
-LEASING_INIT = 10
+LEASING_INIT = 20
 class MinerDB:
     def __init__(self):
         self.key = []     # primary key, the name of the seed or its pub key

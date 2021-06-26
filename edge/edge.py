@@ -51,12 +51,12 @@ class DataFeeder:                   # emulate each round dataset feeder
 
 def fetchList(addr):
     response = requests.get("{}/miner_peers".format(addr))
-    data = response.content
-    return data
+    print(response.json())
+    return response.json()['peers']
 
 def getLatest(addr):
-    response = requests.get("{}/get_global".format(addr))
-    data = json.loads(response.content)
+    response = requests.get("{}/global_model".format(addr))
+    data = response.json()
     return data['weight'], data['preprocPara'], data['trainPara']
 
 def pushTrained(size, loss, weight, addr):
@@ -115,7 +115,7 @@ def localTraining(model, data, para):
             loss.backward()
             optimizer.step()
             loss_sum += loss.item()
-        # print(f"[epoch {ep+1}]\t[avg loss]\t{loss_sum/i}")
+        print(f"[epoch {ep+1}]\t[avg loss]\t{loss_sum/i}")
     return size, loss_sum/i, save_weights_into_dict(model)
 
 # emulator local init =======================================

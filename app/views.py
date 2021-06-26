@@ -22,7 +22,7 @@ def fetch_posts():
     Function to fetch the chain from a blockchain node, parse the
     data and store it locally.
     """
-    get_chain_address = "{}/chain".format(CONNECTED_NODE_ADDRESS)
+    get_chain_address = "{}/chain_print".format(CONNECTED_NODE_ADDRESS)
     response = requests.get(get_chain_address)
     if response.status_code == 200:
         content = []
@@ -74,6 +74,7 @@ def submit_textarea():
         'author': author,
         'content': post_content,
         'timestamp' : timestamp,
+        'type' : 'text',
     }
 
     # Submit a transaction
