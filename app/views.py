@@ -27,9 +27,11 @@ def fetch_posts():
     if response.status_code == 200:
         content = []
         chain = json.loads(response.content)
-        for block in chain["chain"]:
+        for i, block in enumerate(chain["chain"]):
             for tx in block["transactions"]:
-                content.append(tx)
+                new_tx = tx.copy()
+                new_tx["content"] = "<from block#{}>  ".format(i) + new_tx["content"]
+                content.append(new_tx)
 
         global posts
         posts = sorted(content, key=lambda k: k['timestamp'],

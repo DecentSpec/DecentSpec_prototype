@@ -8,6 +8,6 @@ sleep 1
 
 cd ../edge
 source run_edge.sh
-sleep 1
 
+cd ..
 python run_view.py
