@@ -21,7 +21,7 @@ def mix(local_weights, aggr_para, base_model):
     #             averaged_params[k] = local_model_params[k] * w
     #         else:
     #             averaged_params[k] += local_model_params[k] * w                             # dataset size-weighted average
-    #     averaged_params[k] = (1-alpha) * local_weights[k] + alpha * averaged_params[k]      # EWMA
+    #     averaged_params[k] = (1-alpha) * base_model[k] + alpha * averaged_params[k]      # EWMA
     # return averaged_params
 
     return None
