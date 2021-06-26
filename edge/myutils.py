@@ -5,11 +5,13 @@ def dict2tensor(myDict):
     myWeight = {}
     for key in myDict.keys():
         myWeight[key] = torch.tensor(myDict[key])
+    return myWeight
 
 def tensor2dict(myWeight):
     myDict = {}
     for key in myWeight.keys():
         myDict[key] = myWeight[key].tolist()
+    return myDict
 
 # store and load weights
 def save_weights_into_dict(model):

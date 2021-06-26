@@ -4,25 +4,26 @@ import json
 import torch
 # TODO use TorchScript to serialize the model class
 from model import SharedModel
-from myutils import save_weights_into_dict
+from myutils import save_weights_into_dict, dict2tensor, tensor2dict
 
 app = Flask(__name__)
 initModel = SharedModel()
 globalWeight = save_weights_into_dict(initModel)
 
 preprocPara = {
-    'x' : [0,1] ,
-    'y' : [0,1] ,
-    'z' : [0,1] ,
+    'x' : [43.07850074790703,0.026930841086101193] ,
+    'y' : [-89.3982621182465,0.060267757907425355] ,
+    'z' : [-58.52785514280172,7.434576197607559] ,
 }
 trainPara = {
     'batch' : 10,
     'lr'    : 0.001,
     'opt'   : 'Adam',
-    'epoch' : 10,
+    'epoch' : 10,       # local epoch nums
+    'loss'  : 'MSE',
 }
 
-def mix(base_model, local_weight, alpha = 0.5):
+def mix(base_model, local_weight, alpha = 1):
     if not base_model:
         return local_weight
     new_global = local_weight
@@ -37,10 +38,15 @@ def uploadLocal():
     data = request.get_json()
     stat = data['stat']
     print("get a new local with size {} and loss {}".format(stat['size'], stat['loss']))
-    globalWeight = mix(globalWeight, data['weight'])
+    globalWeight = tensor2dict( mix( dict2tensor(globalWeight),     # only tensor can array operation
+                                     dict2tensor(data['weight'])))  # so change to tensor temporarily
+    return "success", 201
 
 @app.route('/get_global', methods=['GET'])
 def getGlobal():
+    global globalWeight
+    global preprocPara
+    global trainPara
     data = {
         'weight' : globalWeight,
         'preprocPara' : preprocPara,
