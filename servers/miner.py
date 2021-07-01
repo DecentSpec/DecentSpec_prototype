@@ -126,15 +126,13 @@ def new_transaction():
 
     global mypool
 
-    if "do_not_spread" in tx_data:      # if it is from some other miners
-        tx_data.pop("do_not_spread")
-        mypool.add(tx_data)             # just add to the pool and do not spread
-    else:                               # if it does not come from other miners
+    if "plz_spread" in tx_data:         # if edge ask me to help him spread
+        tx_data.pop("plz_spread")
         mypool.add(tx_data)
-        tx_data["do_not_spread"] = 1    # set the do not spread flag
-        #  let a temporal thread to do the spread work to save time
         thread = Thread(target=spread_tx_to_peers, args=[tx_data])
         thread.start()
+    else:
+        mypool.add(tx_data)             # just add to the pool and do not spread
 
     return "Success", 201
 
@@ -160,13 +158,15 @@ def get_pending_tx():
 def get_global():
     global mychain
     global_model = mychain.last_block.get_global()
-    preprocPara = mychain.last_block.aggr_para["preprocPara"]
-    trainPara = mychain.last_block.aggr_para["trainPara"]
+    preprocPara = mychain.last_block.para["preprocPara"]
+    trainPara = mychain.last_block.para["trainPara"]
+    layerStructure = mychain.last_block.para["layerStructure"]
     gen = mychain.last_block.index
     return json.dumps({ "weight": global_model,
                         "generation": gen,
                         "preprocPara" : preprocPara,
                         "trainPara" : trainPara,
+                        "layerStructure" : layerStructure,
                         })
 
 @app.route('/chain', methods=['GET'])
@@ -215,7 +215,7 @@ def verify_and_add_block():
                   block_data["base_model"],
                   block_data["miner"],
                   block_data["difficulty"],
-                  block_data["aggr_para"],
+                  block_data["para"],
                   block_data["nonce"])
                 # TODO block from dict to an object
 
@@ -267,7 +267,7 @@ def create_list_from_dump(chain_dump):
                       block_data["base_model"],
                       block_data["miner"],
                       block_data["difficulty"],
-                      block_data["aggr_para"],
+                      block_data["para"],
                       block_data["nonce"])
         block.hash = block_data["hash"]
         chain.append(block)

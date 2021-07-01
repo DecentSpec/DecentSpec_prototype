@@ -4,11 +4,11 @@ from myutils import genHash, genTimestamp, dict2tensor, tensor2dict
 
 DIFF=2
 
-def mix(transactions, aggr_para, base_model):
+def mix(transactions, para, base_model):
 
     # uncomment it when edge device implemented
 
-    alpha = aggr_para['alpha']
+    alpha = para['alpha']
     local_weights = []
     training_num = 0
     for tx in transactions:
@@ -41,10 +41,11 @@ def mix(transactions, aggr_para, base_model):
 
 class Block:
     def __init__(self, index, transactions, timestamp, previous_hash,  \
-                base_model, miner, difficulty, aggr_para, nonce=0,):     # TODO, add those new arguments
+                base_model, miner, difficulty, para, nonce=0,):     # TODO, add those new arguments
         
         # model update list, all those local weights
-        self.transactions = transactions
+        # TODO might introduce extra bug, since list is copy by ref
+        self.transactions = transactions.copy()
         # global model, we use a lazy policy to generate global model when we need it, to save time
         self.base_model = base_model            # the start model for those local weights
         self.global_model = None              # the gathered new global model
@@ -57,7 +58,7 @@ class Block:
         self.miner = miner                      # miner's public key
 
         # some inherit constants
-        self.aggr_para = aggr_para              # model aggregation parameters together with training para
+        self.para = para              # model aggregation parameters together with training para
         self.difficulty = difficulty            # difficulty, actually this field is not used
 
     def compute_hash(self):
@@ -73,7 +74,7 @@ class Block:
             return self.global_model
         if self.transactions == None:
             return self.base_model
-        mixed = mix(self.transactions, self.aggr_para, dict2tensor(self.base_model))
+        mixed = mix(self.transactions, self.para, dict2tensor(self.base_model))
         if mixed:
             return mixed
         else:
@@ -91,19 +92,19 @@ class BlockChain:
     def clear(self):
         self.chain = []
 
-    def create_genesis_block(self, global_model, aggr_para):
+    def create_genesis_block(self, global_model, para):
         """
         A function to generate genesis block and appends it to
         the chain. The block has index 0, previous_hash as 0, and
         a valid hash.
         """
         genesis_block = Block(  0, [], genTimestamp(), "genesisHash", 
-                                base_model={},
+                                base_model={"this is":"an genesis block"},
                                 miner=self.name,
                                 difficulty=BlockChain.difficulty,
-                                aggr_para=aggr_para)
+                                para=para)
         genesis_block.hash = genesis_block.compute_hash()
-        genesis_block.global_model = global_model
+        genesis_block.global_model = global_model # manually set global model 
         self.chain.append(genesis_block)
         print("first block hash: {}".format(genesis_block.hash))
 
@@ -214,7 +215,7 @@ class BlockChain:
                           miner=self.name,
                           base_model=self.last_block.get_global(),
                           difficulty=self.last_block.difficulty,
-                          aggr_para=self.last_block.aggr_para
+                          para=self.last_block.para
                           )
 
         proof = self.proof_of_work(new_block)

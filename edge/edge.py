@@ -57,7 +57,7 @@ def fetchList(addr):
 def getLatest(addr):
     response = requests.get("{}/global_model".format(addr))
     data = response.json()
-    return data['weight'], data['preprocPara'], data['trainPara']
+    return data['weight'], data['preprocPara'], data['trainPara'], data['layerStructure']
 
 def pushTrained(size, loss, weight, addr):
     MLdata = {
@@ -71,6 +71,7 @@ def pushTrained(size, loss, weight, addr):
         'content' : MLdata,
         'timestamp' : genTimestamp(),
         'type' : 'localModelWeight',
+        'plz_spread' : 1,
     }
     requests.post(  addr + '/new_transaction',
                     json=data,
@@ -125,10 +126,10 @@ while localFeeder.haveData():
 # full life cycle of one round ==============================
     # miner communication
     minerList = fetchList(SEED_ADDR)
-    modelWeights, preprocPara, trainPara = getLatest(minerList[0])
+    modelWeights, preprocPara, trainPara, layerStructure = getLatest(minerList[0])
     # model init, should have built according to miner response
     # TODO sharedModel is impossible in real situation
-    myModel = SharedModel()
+    myModel = SharedModel(layerStructure)
     load_weights_from_dict(myModel, modelWeights)
     # data preprocessing setup
     localFeeder.setPreProcess(preprocPara)
@@ -138,4 +139,7 @@ while localFeeder.haveData():
     pushTrained(size, loss, weight, minerList[0])
 # end of the life cycle =====================================
 
+print("local dataset training done!")
+while True:
+    pass
 # TODO loss estimation and map visualization

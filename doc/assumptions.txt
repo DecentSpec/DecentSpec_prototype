@@ -5,3 +5,4 @@ for miner:
     4 currently no reward implementation - need add pub key gen module first
     5 more exception raise
     6 need to use formatted logger
+    7 eliminate duplicate data-based local updates in one block

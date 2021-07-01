@@ -5,16 +5,17 @@ import time
 from flask import Flask, request
 from database import MinerDB, RewardDB
 from model import SharedModel # TODO 
-from myutils import save_weights_into_dict
+from myutils import save_weights_into_dict, genName
 import threading
 
 seed = Flask(__name__)
 myport = "5000"
 if (len(sys.argv) == 2):
     myport = sys.argv[1]
-
+myName = genName()
 myMembers = MinerDB()
-seedModel = SharedModel()
+layerStructure = [2,50,50,1]
+seedModel = SharedModel(layerStructure)
 preprocPara = {
     'x' : [43.07850074790703,0.026930841086101193] ,
     'y' : [-89.3982621182465,0.060267757907425355] ,
@@ -28,9 +29,10 @@ trainPara = {
     'loss'  : 'MSE',
 }
 Para = {
-    'alpha' : 0.5,
+    'alpha' : 1,
     'preprocPara' : preprocPara,
     'trainPara' : trainPara,
+    'layerStructure' : layerStructure,
 }
 
 # register related api 
@@ -46,9 +48,11 @@ def reg_miner():
     reg_data = request.get_json()
     myMembers.regNew(reg_data["name"], reg_data["addr"])
     ret = {
-        'list' : myMembers.getList(),
+        'name' : 'seed1',
+        'from' : myName,
         'seedWeight' : save_weights_into_dict(seedModel),
         'para' : Para,
+        'list' : myMembers.getList(),
     }
     # print(ret)
     # print("reged a new node")
@@ -63,11 +67,11 @@ def flush():
     global myMembers
     global seedModel
     global Para
-    seedModel = SharedModel()
+    seedModel = SharedModel(layerStructure)
     globalWeight = save_weights_into_dict(seedModel)
     post_object = {
         'name' : 'seed1',
-        'from' : 'admin1',
+        'from' : myName,
         'seedWeight' : globalWeight,
         'para' : Para,
     }
