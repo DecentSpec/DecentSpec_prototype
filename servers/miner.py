@@ -9,7 +9,7 @@ from flask import Flask, request, current_app
 import requests
 
 from block import Block, BlockChain
-from model import ModelPool
+from pool import ModelPool
 from myutils import genName, check_chain_validity
 
 BLOCK_GEN_INTERVAL = 3 # unit second

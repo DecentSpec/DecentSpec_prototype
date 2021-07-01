@@ -39,9 +39,9 @@ class ModelPool:
 #         self.size = None        # size of dataset
 #         self.base = None        # version of base_global_model, may sha256 to uniquely assign it
 
-class SeedingMsg:             # this is not an actual class we will use, just format the json structure of seed we received
-    def __init__(self, raw):
-        self.admin = raw["admin"]
-        self.name = raw["name"]
-        self.model = raw["model"]
-        self.para = raw["para"]
+# class SeedingMsg:             # this is not an actual class we will use, just format the json structure of seed we received
+#     def __init__(self, raw):
+#         self.admin = raw["admin"]
+#         self.name = raw["name"]
+#         self.model = raw["model"]
+#         self.para = raw["para"]
