@@ -14,6 +14,7 @@ if (len(sys.argv) == 2):
     myport = sys.argv[1]
 myName = genName()
 myMembers = MinerDB()
+
 layerStructure = [2,50,50,1]
 seedModel = SharedModel(layerStructure)
 preprocPara = {
@@ -33,7 +34,10 @@ Para = {
     'preprocPara' : preprocPara,
     'trainPara' : trainPara,
     'layerStructure' : layerStructure,
+    'difficulty' : 2,
 }
+
+rewardRecord = RewardDB(myMembers, Para)
 
 # register related api 
 @seed.route('/miner_peers', methods=['GET'])

@@ -7,7 +7,10 @@ might change to a real db lib later
 
 from threading import Thread, Lock
 import time
+import requests
+from myutils import check_chain_validity
 
+SCAN_RATE = 10      # compute reward per 10s
 LEASING_RATE = 1    # rate of leasing timer reduction
 LEASING_INIT = 20
 class MinerDB:
@@ -69,5 +72,37 @@ class MinerDB:
         return self.key[idx] + ' ' + self.addr[idx] + ' ' + str(self.timer[idx])
 
 class RewardDB:
-    def __init__(self):
-        pass
+    def __init__(self, MinerDB, para):
+        self.key = []
+        self.role = []
+        self.block_ctr = []
+        self.update_ctr = []
+        self.reward = []
+        self.myMember = MinerDB
+        self.para = para
+        self.__runscan()
+
+    def scan(self):
+        while True:
+            peers = self.myMember.getList()
+            print("scan the memberlist to compute reward")
+            current_len = 0
+            chain = []
+            fromwhom = 'nobody'
+            for miner in peers:
+                response = requests.get('{}/chain'.format(miner))
+                data = response.json()
+                length = data['length']
+                chain = data['chain']
+                if length > current_len and check_chain_validity(chain, self.para["difficulty"]):
+                    current_len = length
+                    longest_chain = chain
+                    fromwhom = miner
+            print("longest chain from {}".format(fromwhom))
+            time.sleep(SCAN_RATE)
+
+
+    def __runscan(self):
+        scan_thread = Thread(target=self.scan)
+        scan_thread.setDaemon(True)
+        scan_thread.start()

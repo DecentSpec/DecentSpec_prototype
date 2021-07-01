@@ -10,7 +10,7 @@ import requests
 
 from block import Block, BlockChain
 from model import ModelPool
-from myutils import genName
+from myutils import genName, check_chain_validity
 
 BLOCK_GEN_INTERVAL = 3 # unit second
 POOL_MIN_THRESHOLD = 1
@@ -84,7 +84,7 @@ regThread.start()
 print("wait for registration ...")
 while not mystatus:
     pass
-mychain.create_genesis_block(seedWeight, mypara)
+mychain.create_genesis_block(seedWeight, mypara)           # progress only after reg
 
 # ==============================================================================
 # seed flush related api
@@ -214,7 +214,6 @@ def verify_and_add_block():
                   block_data["previous_hash"],
                   block_data["base_model"],
                   block_data["miner"],
-                  block_data["difficulty"],
                   block_data["para"],
                   block_data["nonce"])
                 # TODO block from dict to an object
@@ -241,6 +240,9 @@ def mine_unconfirmed_transactions():
     global mypool
     while True:
         time.sleep(BLOCK_GEN_INTERVAL)  # check the pool size per BGI
+        if not mychain.difficulty:
+            print("difficulty is not set")
+            continue
         if mypool.size() >= POOL_MIN_THRESHOLD: # gen a new block when the size achieve our threshold
             print("i am trying mining")
             if mychain.mine(mypool.getPool()):  # TODO mine should be interrupt when receive a seed_update flush
@@ -266,7 +268,6 @@ def create_list_from_dump(chain_dump):
                       block_data["previous_hash"],
                       block_data["base_model"],
                       block_data["miner"],
-                      block_data["difficulty"],
                       block_data["para"],
                       block_data["nonce"])
         block.hash = block_data["hash"]
@@ -293,7 +294,7 @@ def consensus():
         # NOTICE this chain is a list of dict NOT an object!!!
         # print(length)
         # print(chain)
-        if length > current_len and mychain.check_chain_validity(chain):
+        if length > current_len and check_chain_validity(chain, mychain.difficulty):
             current_len = length
             longest_chain = create_list_from_dump(chain)
             am_i_the_longest = False

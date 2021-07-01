@@ -1,6 +1,6 @@
 import json
 import time
-from myutils import genHash, genTimestamp, dict2tensor, tensor2dict
+from myutils import genHash, genTimestamp, dict2tensor, tensor2dict, is_valid_proof, proof_of_work
 
 DIFF=2
 
@@ -41,7 +41,7 @@ def mix(transactions, para, base_model):
 
 class Block:
     def __init__(self, index, transactions, timestamp, previous_hash,  \
-                base_model, miner, difficulty, para, nonce=0,):     # TODO, add those new arguments
+                base_model, miner, para, nonce=0,):     # TODO, add those new arguments
         
         # model update list, all those local weights
         # TODO might introduce extra bug, since list is copy by ref
@@ -59,7 +59,6 @@ class Block:
 
         # some inherit constants
         self.para = para              # model aggregation parameters together with training para
-        self.difficulty = difficulty            # difficulty, actually this field is not used
 
     def compute_hash(self):
         """
@@ -81,16 +80,15 @@ class Block:
             return self.base_model
 
 class BlockChain:
-    # difficulty of our PoW algorithm
-    # currently it is fixed, but we will make it modifiable TODO
-    difficulty = DIFF
 
     def __init__(self, name):
         self.chain = []
         self.name = name
-    
+        self.difficulty = 0
+
     def clear(self):
         self.chain = []
+        self.difficulty = 0
 
     def create_genesis_block(self, global_model, para):
         """
@@ -98,10 +96,10 @@ class BlockChain:
         the chain. The block has index 0, previous_hash as 0, and
         a valid hash.
         """
+        self.difficulty = para["difficulty"]
         genesis_block = Block(  0, [], genTimestamp(), "genesisHash", 
                                 base_model={"this is":"an genesis block"},
                                 miner=self.name,
-                                difficulty=BlockChain.difficulty,
                                 para=para)
         genesis_block.hash = genesis_block.compute_hash()
         genesis_block.global_model = global_model # manually set global model 
@@ -134,67 +132,13 @@ class BlockChain:
             # print("yourhash " + block.previous_hash)
             return False
 
-        if not BlockChain.is_valid_proof(block, proof):
+        if not is_valid_proof(block, proof, self.difficulty):
             print("add block failed at 2")
             return False
 
         block.hash = proof
         self.chain.append(block)
         return True
-
-    @classmethod
-    def proof_of_work(cls, block):
-        """
-        Function that tries different values of nonce to get a hash
-        that satisfies our difficulty criteria.
-        """
-        block.nonce = 0
-
-        computed_hash = block.compute_hash()
-        while not computed_hash.startswith('0' * cls.difficulty):
-            block.nonce += 1
-            computed_hash = block.compute_hash()
-
-        return computed_hash
-
-    @classmethod
-    def is_valid_proof(cls, block, block_hash):
-        """
-        Check if block_hash is valid hash of block 
-        and satisfies the difficulty criteria.
-        """
-        if isinstance(block, Block):            # if it is an object
-            fresh_hash = block.compute_hash()
-            isGenesis = not block.index
-        else:
-            fresh_hash = genHash(block)         # if it is a dict block
-            isGenesis = not block["index"]      # genesis block do not have a valid nonce
-        
-        if isGenesis:
-            # print(block_hash == fresh_hash)
-            return block_hash == fresh_hash
-        else:
-            # print((block_hash.startswith('0' * cls.difficulty) and
-            #     block_hash == fresh_hash))
-            return (block_hash.startswith('0' * cls.difficulty) and
-                block_hash == fresh_hash)
-
-    @classmethod
-    def check_chain_validity(cls, chain):
-        previous_hash = "genesisHash"
-
-        # check the model version of the chain first
-        # TODO the model version must the same with mine, before we really validate it
-        for block in chain:
-            block_hash = block["hash"]
-            # using `compute_hash` method.
-            if not cls.is_valid_proof(block, block_hash) or \
-                    previous_hash != block["previous_hash"]:
-                print("badchain: block #{} is invalid".format(block["index"]))
-                return False
-            previous_hash = block_hash
-        return True
-
 
     def mine(self, unconfirmed_transactions):
         """
@@ -214,11 +158,10 @@ class BlockChain:
                           previous_hash=last_block.hash,
                           miner=self.name,
                           base_model=self.last_block.get_global(),
-                          difficulty=self.last_block.difficulty,
                           para=self.last_block.para
                           )
 
-        proof = self.proof_of_work(new_block)
+        proof = proof_of_work(new_block, self.difficulty)
     
         self.add_block(new_block, proof)
 
