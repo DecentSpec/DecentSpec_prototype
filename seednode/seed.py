@@ -15,7 +15,7 @@ if (len(sys.argv) == 2):
 myName = genName()
 myMembers = MinerDB()
 
-layerStructure = [2,50,50,1]
+layerStructure = [2,50,50,50,1]
 seedModel = SharedModel(layerStructure)
 preprocPara = {
     'x' : [43.07850074790703,0.026930841086101193] ,

@@ -74,10 +74,12 @@ class MinerDB:
 class RewardDB:
     def __init__(self, MinerDB, para):
         self.key = []
+
         self.role = []
         self.block_ctr = []
         self.update_ctr = []
         self.reward = []
+        
         self.myMember = MinerDB
         self.para = para
         self.__runscan()

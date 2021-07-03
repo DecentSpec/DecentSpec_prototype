@@ -59,10 +59,10 @@ def getLatest(addr):
     data = response.json()
     return data['weight'], data['preprocPara'], data['trainPara'], data['layerStructure']
 
-def pushTrained(size, loss, weight, addr):
+def pushTrained(size, lossDelta, weight, addr):
     MLdata = {
         'stat' : {  'size' : size,
-                    'loss' : loss,},
+                    'lossDelta' : lossDelta,},
         'weight' : weight
     }
     global myName
@@ -106,6 +106,8 @@ def localTraining(model, data, para):
     lossFunc = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr = lrate)
 
+    avg_loss_begin = 0
+    avg_loss_end = 0
     for ep in range(epoch):
         loss_sum = 0.0
         for i, data in enumerate(trainLoader, 0):
@@ -117,7 +119,12 @@ def localTraining(model, data, para):
             optimizer.step()
             loss_sum += loss.item()
         print(f"[epoch {ep+1}]\t[avg loss]\t{loss_sum/i}")
-    return size, loss_sum/i, save_weights_into_dict(model)
+        if ep == 0:
+            avg_loss_begin = loss_sum/i
+        if ep == epoch - 1:
+            avg_loss_end = loss_sum/i
+
+    return size, avg_loss_begin - avg_loss_end, save_weights_into_dict(model)
 
 # emulator local init =======================================
 localFeeder = DataFeeder(LOCAL_DATASET)
@@ -134,9 +141,9 @@ while localFeeder.haveData():
     # data preprocessing setup
     localFeeder.setPreProcess(preprocPara)
     # local training
-    size, loss, weight = localTraining(myModel, localFeeder.fetch(), trainPara)
+    size, lossDelta, weight = localTraining(myModel, localFeeder.fetch(), trainPara)
     # send back to server
-    pushTrained(size, loss, weight, minerList[0])
+    pushTrained(size, lossDelta, weight, minerList[0])
 # end of the life cycle =====================================
 
 print("local dataset training done!")
