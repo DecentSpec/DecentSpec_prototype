@@ -36,7 +36,7 @@ Para = {
     'preprocPara' : preprocPara,
     'trainPara' : trainPara,
     'layerStructure' : layerStructure,
-    'difficulty' : 3,
+    'difficulty' : 4,
 }
 
 rewardRecord = RewardDB(myMembers, Para)

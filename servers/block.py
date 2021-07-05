@@ -119,19 +119,19 @@ class BlockChain:
         previous_hash = self.last_block.hash
 
         if block.index != self.last_block.index + 1:
-            print("add block failed at 0")
+            print("[add block failed] index mismatch")
             # print("their block index: " + str(block.index))
             # print("our block latest index: " + str(self.last_block.index))
             return False
 
         if previous_hash != block.previous_hash:
-            print("add block failed at 1")
+            print("[add block failed] hash link mismatch")
             # print("myhash " + previous_hash)
             # print("yourhash " + block.previous_hash)
             return False
 
         if not is_valid_proof(block, proof, self.difficulty):
-            print("add block failed at 2")
+            print("[add block failed] hash value mismatch")
             return False
 
         block.hash = proof
