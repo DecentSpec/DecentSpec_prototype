@@ -12,6 +12,12 @@ cd ../servers
 source run_miner.sh
 ```
 
+run an edge device simulator:
+```sh
+cd ../edge
+source run_edge.sh
+```
+
 run the blockchain viewer, the console will remain in viewer's terminal:
 ```sh
 cd ..

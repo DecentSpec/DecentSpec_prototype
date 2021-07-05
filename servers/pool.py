@@ -1,4 +1,6 @@
 import json
+from threading import Lock
+
 class ModelPool:
     def __init__(self):
         self.pool = set()
@@ -19,7 +21,7 @@ class ModelPool:
     def remove(self, subpool):
         self.pool = self.pool - subpool
 
-    def clear(self):
+    def flush(self):
         self.pool = set()
 
     def size(self):
@@ -45,3 +47,16 @@ class ModelPool:
 #         self.name = raw["name"]
 #         self.model = raw["model"]
 #         self.para = raw["para"]
+
+class Intrpt:
+    def __init__(self, desc="noDescription"):
+        self.flag = False
+        self.lock = Lock()
+    def checkAndRst(self):
+        with self.lock:
+            ret = self.flag
+            self.flag = False
+        return ret
+    def Raise(self):
+        with self.lock:
+            self.flag = True

@@ -12,10 +12,12 @@ seed = Flask(__name__)
 myport = "5000"
 if (len(sys.argv) == 2):
     myport = sys.argv[1]
-myName = genName()
+myName = genName()  # name of this seed server
+print("***** NODE init, I am seed {} *****".format(myName))
 myMembers = MinerDB()
 
-layerStructure = [2,50,50,50,1]
+layerStructure = [2,10,10,1]
+seedName = genName()    # name of this seed
 seedModel = SharedModel(layerStructure)
 preprocPara = {
     'x' : [43.07850074790703,0.026930841086101193] ,
@@ -34,7 +36,7 @@ Para = {
     'preprocPara' : preprocPara,
     'trainPara' : trainPara,
     'layerStructure' : layerStructure,
-    'difficulty' : 2,
+    'difficulty' : 3,
 }
 
 rewardRecord = RewardDB(myMembers, Para)
@@ -52,7 +54,7 @@ def reg_miner():
     reg_data = request.get_json()
     myMembers.regNew(reg_data["name"], reg_data["addr"])
     ret = {
-        'name' : 'seed1',
+        'name' : seedName,
         'from' : myName,
         'seedWeight' : save_weights_into_dict(seedModel),
         'para' : Para,
@@ -96,7 +98,7 @@ def memberList():
 
 memListThread = threading.Thread(target=memberList)
 memListThread.setDaemon(True)
-memListThread.start()
+# memListThread.start()
 
 if __name__ == '__main__':
     seed.run(port=int(myport))

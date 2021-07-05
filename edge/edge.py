@@ -1,6 +1,7 @@
 import requests
 import json
 import jsonpickle
+import random
 
 import torch
 import torch.nn as nn
@@ -10,9 +11,14 @@ from myutils import save_weights_into_dict, load_weights_from_dict, genName, gen
 # TODO use TorchScript to serialize the model class
 from model import SharedModel
 
+# do we need to random send?
+RANDOM_SIM = True
+# ==========================
+
 SEED_ADDR = "http://127.0.0.1:5000"
 LOCAL_DATASET = "GPS-power.dat"     # data structure 
 myName = genName()
+print("***** NODE init, I am edge {} *****".format(myName))
 
 class DataFeeder:                   # emulate each round dataset feeder
     def __init__(self, filePath):
@@ -66,6 +72,8 @@ def pushTrained(size, lossDelta, weight, addr):
         'weight' : weight
     }
     global myName
+    if RANDOM_SIM:
+        myName = genName()
     data = {
         'author' : myName,
         'content' : MLdata,
@@ -143,7 +151,10 @@ while localFeeder.haveData():
     # local training
     size, lossDelta, weight = localTraining(myModel, localFeeder.fetch(), trainPara)
     # send back to server
-    pushTrained(size, lossDelta, weight, minerList[0])
+    addr = minerList[0]
+    if RANDOM_SIM:
+        addr = random.choice(minerList)
+    pushTrained(size, lossDelta, weight, addr)
 # end of the life cycle =====================================
 
 print("local dataset training done!")

@@ -10,7 +10,7 @@ import time
 import requests
 from myutils import check_chain_validity
 
-SCAN_RATE = 10      # compute reward per 10s
+SCAN_RATE = 20      # compute reward per 10s
 LEASING_RATE = 1    # rate of leasing timer reduction
 LEASING_INIT = 20
 class MinerDB:
@@ -69,20 +69,38 @@ class MinerDB:
         tick_thread.start()
     
     def showMember(self, idx):
-        return self.key[idx] + ' ' + self.addr[idx] + ' ' + str(self.timer[idx])
+        return self.key[idx] + '\t' + self.addr[idx] + '\t' + str(self.timer[idx])
+
+class Contributor:
+    DELTA_THRESHOLD = 0.0
+    def __init__(self, key, role):
+        self.key = key
+        self.role = role
+        self.mined_block = 0
+        self.shared_weight = 0
+        self.reward = 0
+    def submit(self, size, lossDelta):
+        self.shared_weight += 1
+        # print("get a local update with size {} and loss {}".format(size, lossDelta))
+        if lossDelta > Contributor.DELTA_THRESHOLD:
+            self.reward += int(size) * float(lossDelta)
+    def mine(self):
+        self.mined_block += 1
+    def showContribution(self):
+        return  self.key + '\t' + self.role + ' \t' + \
+                str(self.mined_block) + '   \t' + \
+                str(self.shared_weight) + '    \t' +str(self.reward)
 
 class RewardDB:
     def __init__(self, MinerDB, para):
-        self.key = []
-
-        self.role = []
-        self.block_ctr = []
-        self.update_ctr = []
-        self.reward = []
+        self.rewardDict = {}
         
-        self.myMember = MinerDB
-        self.para = para
+        self.myMember = MinerDB # link with memberlist for scan
+        self.para = para        # link with para
         self.__runscan()
+    
+    def __flush(self):
+        self.rewardDict = {}
 
     def scan(self):
         while True:
@@ -91,18 +109,47 @@ class RewardDB:
             current_len = 0
             chain = []
             fromwhom = 'nobody'
+            longest_chain = []
             for miner in peers:
                 response = requests.get('{}/chain'.format(miner))
-                data = response.json()
-                length = data['length']
-                chain = data['chain']
+                length = response.json()['length']
+                chain = response.json()['chain']
                 if length > current_len and check_chain_validity(chain, self.para["difficulty"]):
                     current_len = length
                     longest_chain = chain
                     fromwhom = miner
             print("longest chain from {}".format(fromwhom))
+            self.updateReward(longest_chain)
+            print("============== Reward Database ===============")
+            print("key     \trole \tmined\tupdate\treward")
+            for node in self.rewardDict:
+                print(self.rewardDict[node].showContribution())
+            print("============== =============== ===============")
             time.sleep(SCAN_RATE)
+    
+    def updateReward(self, dictChain):
+        self.__flush()  # calculate reward from the very first block
+        for block in dictChain:
+            # calculate miner contribution
+            # print("the miner of this block is {}".format(block['miner']))
+            key = block['miner']
+            if block['index'] == 0:
+                self.rewardDict[key] = Contributor(key, 'seed')
+                self.rewardDict[key].mine()
+                continue
+            if not block['miner'] in self.rewardDict:
+                self.rewardDict[key] = Contributor(key, 'miner')
+            self.rewardDict[key].mine()
 
+            for tx in block["transactions"]:
+                if tx["type"] == "localModelWeight":
+                    # calculate edge contribution
+                    # print("the author of this update is {}".format(tx['author']))
+                    key = tx['author']
+                    if not tx['author'] in self.rewardDict:
+                        self.rewardDict[key] = Contributor(key, 'edge')
+                    self.rewardDict[key].submit(tx['content']['stat']['size'],
+                                                tx['content']['stat']['lossDelta'])
 
     def __runscan(self):
         scan_thread = Thread(target=self.scan)

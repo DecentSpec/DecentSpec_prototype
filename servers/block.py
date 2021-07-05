@@ -1,8 +1,6 @@
 import json
 import time
-from myutils import genHash, genTimestamp, dict2tensor, tensor2dict, is_valid_proof, proof_of_work
-
-DIFF=2
+from myutils import *
 
 def mix(transactions, para, base_model):
 
@@ -86,20 +84,20 @@ class BlockChain:
         self.name = name
         self.difficulty = 0
 
-    def clear(self):
+    def flush(self):
         self.chain = []
         self.difficulty = 0
 
-    def create_genesis_block(self, global_model, para):
+    def create_genesis_block(self, global_model, para, genesisMiner):
         """
         A function to generate genesis block and appends it to
         the chain. The block has index 0, previous_hash as 0, and
         a valid hash.
         """
         self.difficulty = para["difficulty"]
-        genesis_block = Block(  0, [], genTimestamp(), "genesisHash", 
+        genesis_block = Block(  0, [], 0, GENESIS_HASH, # timestamp must be zero to keep hash the same
                                 base_model={"this is":"an genesis block"},
-                                miner=self.name,
+                                miner=genesisMiner,
                                 para=para)
         genesis_block.hash = genesis_block.compute_hash()
         genesis_block.global_model = global_model # manually set global model 
@@ -140,7 +138,7 @@ class BlockChain:
         self.chain.append(block)
         return True
 
-    def mine(self, unconfirmed_transactions):
+    def mine(self, unconfirmed_transactions, intr):
         """
         This function serves as an interface to add the pending
         transactions to the blockchain by adding them to the block
@@ -149,7 +147,9 @@ class BlockChain:
         
         if not unconfirmed_transactions:
             return False
-
+        if intr.checkAndRst():
+            return False
+        
         last_block = self.last_block
 
         new_block = Block(index=last_block.index + 1,
@@ -161,9 +161,12 @@ class BlockChain:
                           para=self.last_block.para
                           )
 
-        proof = proof_of_work(new_block, self.difficulty)
+        succ, proof = proof_of_work(new_block, self.difficulty, intr)
     
-        self.add_block(new_block, proof)
+        if succ:
+            self.add_block(new_block, proof)
+        else:
+            del new_block
 
         # do not forget to empty the pool in outside context
-        return True
+        return succ

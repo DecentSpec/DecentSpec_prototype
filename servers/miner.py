@@ -9,7 +9,7 @@ from flask import Flask, request, current_app
 import requests
 
 from block import Block, BlockChain
-from pool import ModelPool
+from pool import ModelPool, Intrpt
 from myutils import genName, check_chain_validity
 
 BLOCK_GEN_INTERVAL = 3 # unit second
@@ -22,6 +22,7 @@ app = Flask(__name__)
 myport = sys.argv[1]       # we save the port num from the command line
 myaddr = "http://127.0.0.1:" + myport
 myname = genName()
+print("***** NODE init, I am miner {} *****".format(myname))
 if (len(sys.argv) > 2):
     SEED_ADDRESS = sys.argv[2]
     print("seed is " + SEED_ADDRESS)
@@ -41,9 +42,12 @@ peers = set()
 status_lock = Lock()
 mystatus = False
 
+intr = Intrpt()
+
 mypara = None
 seedWeight = None
 
+adminName = None
 
 # TODO add status machine to miner
 
@@ -56,6 +60,7 @@ def register():
     global seedWeight
     global mypara
     global mystatus
+    global adminName
     # Make a request to register with remote node and obtain information
     data = {"name": myname, "addr": myaddr}
     headers = {'Content-Type': "application/json"}
@@ -64,6 +69,7 @@ def register():
     peers = set(response.json()['list'])
     seedWeight = response.json()['seedWeight']
     mypara = response.json()['para']
+    adminName = response.json()['from']
     mystatus = True
     peers.remove(myaddr)
     # print("peers:")
@@ -84,7 +90,7 @@ regThread.start()
 print("wait for registration ...")
 while not mystatus:
     pass
-mychain.create_genesis_block(seedWeight, mypara)           # progress only after reg
+mychain.create_genesis_block(seedWeight, mypara, adminName)           # progress only after reg
 
 # ==============================================================================
 # seed flush related api
@@ -100,16 +106,16 @@ def flush_chain():
     seed_msg = request.get_json()
     if not valid_seed(seed_msg):
         return "Invalid seed", 400
-    mypool.clear()
-    mychain.clear()
+    mypool.flush()
+    mychain.flush()
     seedWeight = seed_msg['seedWeight']
     mypara = seed_msg['para']
-    mychain.create_genesis_block(seedWeight, mypara)
+    mychain.create_genesis_block(seedWeight, mypara, seed_msg['from'])
     return "Reseeded the chain", 201
 
-def valid_seed(msg):
-    # TODO check the seed sender is real admin
-    return True
+def valid_seed(msg):    # from the same seed server
+    global adminName
+    return msg['from'] == adminName
 
 # ========================================================================================
 # mypool related api
@@ -222,8 +228,13 @@ def verify_and_add_block():
     added = mychain.add_block(block, proof)
 
     if not added:
+        print("outcome block get discarded")
         return "The block was discarded by the node", 400
 
+    global intr
+    intr.Raise()
+    print("new outcome block added")
+    # raiseInterupt2Miner()
     # remove the duplicate tx in the received block from my local pool
     added_tx = set(map(lambda x: json.dumps(x, sort_keys=True), block_data["transactions"])) # from list_of_dict to set_of_tuples, might remove this transition in the future
     
@@ -238,6 +249,7 @@ def verify_and_add_block():
 def mine_unconfirmed_transactions():
 
     global mypool
+    global intr
     while True:
         time.sleep(BLOCK_GEN_INTERVAL)  # check the pool size per BGI
         if not mychain.difficulty:
@@ -245,7 +257,7 @@ def mine_unconfirmed_transactions():
             continue
         if mypool.size() >= POOL_MIN_THRESHOLD: # gen a new block when the size achieve our threshold
             print("i am trying mining")
-            if mychain.mine(mypool.getPool()):  # TODO mine should be interrupt when receive a seed_update flush
+            if mychain.mine(mypool.getPool(), intr):  # TODO mine should be interrupt when receive a seed_update flush
                 if consensus(): # i am the longest
                     announce_new_block(mychain.last_block)
                     added_tx = set(map(lambda x: json.dumps(x, sort_keys=True), mychain.last_block.transactions))
@@ -255,7 +267,7 @@ def mine_unconfirmed_transactions():
                 else:
                     print("get a longer chain from somewhere else")
             else:
-                print("sth wrong with the embedded mine method in the chain object")
+                print("mine halted")
                 
 def create_list_from_dump(chain_dump):
     chain = []
@@ -281,6 +293,7 @@ def consensus():
     """
     global mychain
     global peers
+    global mypool
 
     am_i_the_longest = True
     longest_chain = mychain.chain
@@ -300,6 +313,7 @@ def consensus():
             am_i_the_longest = False
 
     mychain.chain = longest_chain
+    mypool.flush()
     return am_i_the_longest
     """
     TODO

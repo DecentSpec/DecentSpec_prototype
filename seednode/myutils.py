@@ -76,7 +76,7 @@ def check_chain_validity(chain, difficulty): # this is an list-dict chain, not a
         previous_hash = block_hash
     return True
 
-def proof_of_work(block, difficulty):
+def proof_of_work(block, difficulty, intr):
     """
     Function that tries different values of nonce to get a hash
     that satisfies our difficulty criteria.
@@ -87,5 +87,6 @@ def proof_of_work(block, difficulty):
     while not computed_hash.startswith('0' * difficulty):
         block.nonce += 1
         computed_hash = block.compute_hash()
-
-    return computed_hash
+        if intr.checkAndRst():
+            return False, "pow interrupted"
+    return True, computed_hash
