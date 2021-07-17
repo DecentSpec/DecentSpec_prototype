@@ -4,8 +4,23 @@ import string
 import json
 import torch
 from hashlib import sha256
+from threading import Lock
+
 
 GENESIS_HASH = "genesisHash"
+
+class Intrpt:
+    def __init__(self, desc="noDescription"):
+        self.flag = False
+        self.lock = Lock()
+    def checkAndRst(self):
+        with self.lock:
+            ret = self.flag
+            self.flag = False
+        return ret
+    def Raise(self):
+        with self.lock:
+            self.flag = True
 
 def genName(num=10):
     salt = ''.join(random.sample(string.ascii_letters + string.digits, num))

@@ -1,5 +1,8 @@
 # nomally flask is single process, single thread, blocking-mode request handling 
 
+# some configuration
+NAMED_POOL = 1     # use author of the model as the hash of the model
+
 import json
 import time
 import sys
@@ -9,8 +12,8 @@ from flask import Flask, request, current_app
 import requests
 
 from block import Block, BlockChain
-from pool import ModelPool, Intrpt
-from myutils import genName, check_chain_validity
+from pool import ModelPool, NamedPool
+from myutils import genName, Intrpt, check_chain_validity
 
 BLOCK_GEN_INTERVAL = 3 # unit second
 POOL_MIN_THRESHOLD = 1
@@ -34,8 +37,8 @@ bc_lock = Lock()
 mychain = BlockChain(myname)
 
 pool_lock = Lock()
-mypool = ModelPool()            # candidate local models
-
+mypool = NamedPool() if NAMED_POOL else ModelPool()            # candidate local models
+    
 peers_lock = Lock()
 peers = set()
 
@@ -122,7 +125,7 @@ def valid_seed(msg):    # from the same seed server
 @app.route('/new_transaction', methods=['POST'])
 def new_transaction(): 
     tx_data = request.get_json()
-    required_fields = ["author", "content", "timestamp"]
+    required_fields = ["author", "content", "timestamp", "type"]
 
     # TODO the tx should in consistence with our model packet structure and within certain generation of the model
 
@@ -236,7 +239,7 @@ def verify_and_add_block():
     print("new outcome block added")
     # raiseInterupt2Miner()
     # remove the duplicate tx in the received block from my local pool
-    added_tx = set(map(lambda x: json.dumps(x, sort_keys=True), block_data["transactions"])) # from list_of_dict to set_of_tuples, might remove this transition in the future
+    added_tx = block_data["transactions"] if NAMED_POOL else set(map(lambda x: json.dumps(x, sort_keys=True), block_data["transactions"])) # from list_of_dict to set_of_tuples, might remove this transition in the future
     
     global mypool
     mypool.remove(added_tx)
@@ -260,7 +263,7 @@ def mine_unconfirmed_transactions():
             if mychain.mine(mypool.getPool(), intr):  # TODO mine should be interrupt when receive a seed_update flush
                 if consensus(): # i am the longest
                     announce_new_block(mychain.last_block)
-                    added_tx = set(map(lambda x: json.dumps(x, sort_keys=True), mychain.last_block.transactions))
+                    added_tx = mychain.last_block.transactions if NAMED_POOL else set(map(lambda x: json.dumps(x, sort_keys=True), mychain.last_block.transactions))
                     mypool.remove(added_tx)  # empty the pool once you finish your mine
                     print("Block #{} is mined.".format(mychain.last_block.index))
                     # print(mychain.last_block.__dict__)

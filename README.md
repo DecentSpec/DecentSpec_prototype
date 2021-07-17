@@ -1,4 +1,4 @@
-# BCxFL for DecentSpct Project
+# BCxFL for DecentSpec Project
 
 run the seed node:
 ```sh
