@@ -35,9 +35,11 @@ class DataFeeder:                   # emulate each round dataset feeder
     def setPreProcess(self, para):
         # set the pre-process para
         # check the data format compatibility
-        for key in para.keys():
-            self.st_avg.append(para[key][0])    # average
-            self.st_dev.append(para[key][1])    # std deviation
+        # for key in para.keys():
+        #     self.st_avg.append(para[key][0])    # average
+        #     self.st_dev.append(para[key][1])    # std deviation
+        self.st_avg = para["avg"].copy()    # average
+        self.st_dev = para["std"].copy()    # std deviation
     def _preproc(self, partialList):
         st_list = []
         for i, line in enumerate(partialList):
@@ -63,6 +65,7 @@ def fetchList(addr):
 def getLatest(addr):
     response = requests.get("{}/global_model".format(addr))
     data = response.json()
+    print(data['weight'])
     return data['weight'], data['preprocPara'], data['trainPara'], data['layerStructure']
 
 def pushTrained(size, lossDelta, weight, addr):
