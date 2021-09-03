@@ -6,3 +6,4 @@ for miner:
     5 more exception raise
     6 need to use formatted logger
     7 eliminate duplicate data-based local updates in one block
+    8 too long time to for PoW when large pool, need a pre-bundling of localweights

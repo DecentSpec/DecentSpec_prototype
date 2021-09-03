@@ -12,7 +12,7 @@ from myutils import save_weights_into_dict, load_weights_from_dict, genName, gen
 from model import SharedModel
 
 # do we need to random send?
-RANDOM_SIM = True
+RANDOM_SIM = False
 # ==========================
 
 SEED_ADDR = "http://127.0.0.1:5000"
@@ -65,7 +65,6 @@ def fetchList(addr):
 def getLatest(addr):
     response = requests.get("{}/global_model".format(addr))
     data = response.json()
-    print(data['weight'])
     return data['weight'], data['preprocPara'], data['trainPara'], data['layerStructure']
 
 def pushTrained(size, lossDelta, weight, addr):
@@ -153,6 +152,7 @@ while localFeeder.haveData():
     localFeeder.setPreProcess(preprocPara)
     # local training
     size, lossDelta, weight = localTraining(myModel, localFeeder.fetch(), trainPara)
+    # print(myModel.state_dict())
     # send back to server
     addr = minerList[0]
     if RANDOM_SIM:

@@ -31,10 +31,15 @@ def genHash(content):               # generate hash from block dict
                                     # to avoid change the original dict, we copy it
     if 'global_model' in content:
         contentDup.pop('global_model') # remove the global_model cause it is lazy generated
+    if 'transactions' in content:
+        contentDup.pop('transactions') # transaction is too large to hash we will use its hash to generate the block's hash
     if 'hash' in content:
         contentDup.pop('hash')         # remove the hash itself
-    block_string = json.dumps(contentDup, sort_keys=True)
-    return sha256(block_string.encode()).hexdigest()
+    return hashValue(contentDup)
+
+def hashValue(content):
+    strValue = json.dumps(content, sort_keys=True)
+    return sha256(strValue.encode()).hexdigest()
 
 # store and load weights
 def save_weights_into_dict(model):

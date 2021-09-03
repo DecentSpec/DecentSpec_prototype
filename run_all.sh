@@ -10,4 +10,3 @@ cd ../edge
 source run_edge.sh
 
 cd ..
-python run_view.py

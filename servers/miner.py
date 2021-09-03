@@ -1,7 +1,7 @@
 # nomally flask is single process, single thread, blocking-mode request handling 
 
 # some configuration
-NAMED_POOL = 1     # use author of the model as the hash of the model
+NAMED_POOL = 0     # use author of the model as the hash of the model
 
 import json
 import time
@@ -136,22 +136,27 @@ def new_transaction():
     global mypool
 
     if "plz_spread" in tx_data:         # if edge ask me to help him spread
+        print("DEBUG: I am going to share this tx with others")
         tx_data.pop("plz_spread")
         mypool.add(tx_data)
         thread = Thread(target=spread_tx_to_peers, args=[tx_data])
         thread.start()
     else:
+        print("DEBUG: I will not share this tx with others")
         mypool.add(tx_data)             # just add to the pool and do not spread
+        
 
     return "Success", 201
 
 def spread_tx_to_peers(tx):
     global peers
+    print("DEBUG: I am starting sharing this tx with others")
+    data = json.dumps(tx, sort_keys=True)
     for peer in peers:
         url = "{}/new_transaction".format(peer)
         headers = {'Content-Type': "application/json"}
         requests.post(url,
-                      data=json.dumps(tx, sort_keys=True),
+                      data,
                       headers=headers)
 
 # endpoint to query unconfirmed transactions
@@ -344,4 +349,4 @@ mineThread.setDaemon(True)  # auto stops when we shut down __main__
 mineThread.start()
 
 if __name__ == '__main__':
-    app.run(port=int(myport))
+    app.run(host='0.0.0.0', port=int(myport))

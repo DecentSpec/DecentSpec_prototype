@@ -44,6 +44,7 @@ class Block:
         # model update list, all those local weights
         # TODO might introduce extra bug, since list is copy by ref
         self.transactions = transactions.copy()
+        self.tx_hash = hashValue(self.transactions) # use the hash of tx to generate the whole block's hash 
         # global model, we use a lazy policy to generate global model when we need it, to save time
         self.base_model = base_model            # the start model for those local weights
         self.global_model = None              # the gathered new global model

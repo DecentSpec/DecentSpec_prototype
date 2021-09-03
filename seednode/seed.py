@@ -16,7 +16,7 @@ myName = genName()  # name of this seed server
 print("***** NODE init, I am seed {} *****".format(myName))
 myMembers = MinerDB()
 
-layerStructure = [2,10,10,1]
+layerStructure = [2,50,50,50,1]
 seedName = genName()    # name of this seed
 seedModel = SharedModel(layerStructure)
 # preprocPara = {
@@ -32,7 +32,7 @@ trainPara = {
     'batch' : 10,
     'lr'    : 0.001,
     'opt'   : 'Adam',
-    'epoch' : 10,       # local epoch nums
+    'epoch' : 5,       # local epoch nums
     'loss'  : 'MSE',
 }
 Para = {
@@ -40,7 +40,7 @@ Para = {
     'preprocPara' : preprocPara,
     'trainPara' : trainPara,
     'layerStructure' : layerStructure,
-    'difficulty' : 4,
+    'difficulty' : 3,
 }
 
 rewardRecord = RewardDB(myMembers, Para)
@@ -105,4 +105,4 @@ memListThread.setDaemon(True)
 # memListThread.start()
 
 if __name__ == '__main__':
-    seed.run(port=int(myport))
+    seed.run(host='0.0.0.0', port=int(myport))
