@@ -23,7 +23,8 @@ REG_PERIOD = 19
 # miner id generation ===========================================================
 app = Flask(__name__)
 myport = sys.argv[1]       # we save the port num from the command line
-myaddr = "http://127.0.0.1:" + myport
+# myaddr = "http://127.0.0.1:" + myport
+myaddr = "http://api.decentspec.org:" + myport
 myname = genName()
 print("***** NODE init, I am miner {} *****".format(myname))
 if (len(sys.argv) > 2):
